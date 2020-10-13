@@ -1,6 +1,5 @@
 import torch.nn as nn
 from abc import ABC
-from .blocks import SimplifiedEncoder
 from .blocks import TransposeResNetBlock
 from .blocks import Reshape
 import numpy as np

@@ -1,30 +1,26 @@
 import os
 from util.progress import Progress
 
-# misc
 is_running_on_desktop = os.name == 'nt'  # nt: Windows , posix: Linux
-directory_log = 'output'
-if is_running_on_desktop:
-    save_log = False
-else:
-    save_log = True
 
-# settings dataset
-train_pct = 90  # in percent
+# -----------------------------------------------------------------------------
+# SETTINGS WINDOWS
 if is_running_on_desktop:
+    directory_log = 'output'
+    save_log = False
+    train_pct = 90  # in percent
     path_dataset = 'C:/Users/Dennis/Documents/dataset_sar/dataset.csv'
     batch_size = 30
     len_dataset = 10
-else:
-    batch_size = 302
-    len_dataset = None
 
-# settings learning-rate tuner
-beta1s = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.999]
-epochs = 20
+    # batch normalisation settings
+    batch_norm = {'momentum': 0.99, 'eps': 1e-3}
 
-# settings of progress tracking
-if is_running_on_desktop:
+    # settings learning-rate tuner
+    beta1s = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.999]
+    epochs = 20
+
+    # progress logging settings
     progress_settings = Progress.Settings(
         print=True,
         lossplot=False,
@@ -35,7 +31,20 @@ if is_running_on_desktop:
         save_lossplot=True,
         save_preview=True,
     )
+
+# -----------------------------------------------------------------------------
+# SETTINGS SERVER
 else:
+    directory_log = 'output'
+    save_log = True
+    train_pct = 90  # in percent
+    batch_size = 302
+    path_dataset = 'dataset_sar/dataset.csv'
+    len_dataset = None
+
+    # settings learning-rate tuner
+    beta1s = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.999]
+    epochs = 20
     progress_settings = Progress.Settings(
         save_design=True,
         load_design=True,
@@ -43,4 +52,3 @@ else:
         save_lossplot=True,
         save_preview=True,
     )
-

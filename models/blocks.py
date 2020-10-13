@@ -1,36 +1,9 @@
 import torch
 import torch.nn as nn
 from abc import ABC
-import numpy as np
+import settings
 
-
-class SimplifiedEncoder(nn.Module, ABC):
-
-    def __init__(self):
-        super().__init__()
-
-    @staticmethod
-    def forward(input_img, input_meta):
-        # only take 2 pixels from the input_img and combine these,
-        # the location of these pixels is chosen such that
-        # it is easy to determine if the image is a triangle, square or circle.
-        px = 2 * input_img[:, :, 3, 16] + input_img[:, :, 8, 3]
-
-        # the input_meta contains phase and amplitude, but only the phase is
-        # of importance for the small dataset
-        meta = input_meta[:, 1].reshape(-1, 1)
-
-        # combine the two
-        return torch.cat((px, meta), 1)
-
-
-class Flatten(nn.Module, ABC):
-    def __init__(self):
-        super().__init__()
-
-    @staticmethod
-    def forward(x):
-        return x.reshape(x.shape[0], -1)
+_last_channels_out = None
 
 
 class Combine(nn.Module, ABC):
@@ -53,55 +26,116 @@ class Reshape(nn.Module, ABC):
         return x.reshape(self.shape)
 
 
-# class ResNetBlock(nn.Module, ABC):
-#     def __init__(self, channels: int, downsample=True):
-#         super().__init__()
-#         self.layers = nn.Sequential(
-#             nn.Conv2d(channels, channels, 3, padding=1),
-#             nn.BatchNorm2d(channels),
-#             nn.ReLU()
-#             nn.Conv2d(channels, channels, 3, padding=1),
-#             nn.BatchNorm2d(channels),
-#             nn.ReLU(),
-#         )
-
-class RepIResBlock(nn.Module, ABC):
-    """
-    Repeats the IResBlock <n_rep> times, in series.
-
-    1. If downsample is true then only the first repetition is down-sampled,
-       the others are not.
-    2. The first block uses in_channel as the input channel, all other
-       blocks use out_channel as the output channel.
-    """
-
-    def __init__(self,
-                 n_rep: int,
-                 in_channels: int,
-                 out_channels: int,
-                 in_resolution: int,
-                 kernel_size: [3, 5, 7] = 3,
-                 downsample: bool = False,
-                 expand=True,
-                 squeeze_and_excite: bool = True):
+class LinBnHs(nn.Module, ABC):
+    def __init__(
+            self,
+            ci: int = None,  # number of input channels
+            co: int = None  # number of output channels
+    ):
         super().__init__()
-        self.blocks = []
-        resolution = in_resolution // 2 if downsample else in_resolution
-        for idx in range(n_rep):
-            self.blocks.append(IResBlock(
-                in_channels if idx == 0 else out_channels,
-                out_channels,
-                in_resolution if idx == 0 else resolution,
-                kernel_size,
-                downsample if idx == 0 else False,
-                expand,
-                squeeze_and_excite
-            ))
+        global _last_channels_out
+        assert co is not None, 'please provide co (number of output channels)'
+        ci = _last_channels_out if ci is None else ci
+        _last_channels_out = co
+
+        self.lin = nn.Linear(ci, co)
+        self.bn = nn.BatchNorm1d(num_features=co, **settings.batch_norm)
+        self.hs = nn.Hardswish()
 
     def forward(self, x):
-        for block in self.blocks:
-            x = block(x)
-        return x
+        return self.hs(self.bn(self.lin(x)))
+
+
+class ConvBnHs(nn.Module, ABC):
+    """
+    (Transpose) Convolutional filter + batch normalisation + hard swish
+    """
+
+    def __init__(
+            self,
+            ci: int = None,  # input channels
+            co: int = None,  # output channels
+            k: int = 3,  # kernel size
+            s: int = 1,  # stride
+            p: int = None,  # padding, if None -> padding is self determined
+            po: int = 1,  # output_padding (only applies for transpose conv)
+            t: bool = False  # transpose convolution or not
+    ):
+        super().__init__()
+        global _last_channels_out
+
+        assert co is not None, 'number of output channels must be provided'
+        assert not (ci is None and _last_channels_out is None)
+
+        # determine padding if needed
+        p = int((k - 1) * 0.5) if p is None else p
+
+        # determine input channels if needed
+        ci = _last_channels_out if ci is None else ci
+
+        # set last channels out
+        _last_channels_out = co
+
+        # use either normal or transpose conv filter
+        if not t:
+            self.conv = nn.Conv2d(in_channels=ci,
+                                  out_channels=co,
+                                  kernel_size=k,
+                                  stride=s,
+                                  padding=p,
+                                  bias=False)
+        else:
+            self.conv = nn.ConvTranspose2d(in_channels=ci,
+                                           out_channels=co,
+                                           kernel_size=k,
+                                           stride=s,
+                                           padding=p,
+                                           output_padding=po,
+                                           bias=False)
+        self.bn = nn.BatchNorm2d(num_features=co, **settings.batch_norm)
+        self.hs = nn.Hardswish()
+
+    def forward(self, x):
+        return self.hs(self.bn(self.conv(x)))
+
+
+# class RepIResBlock(nn.Module, ABC):
+#     """
+#     Repeats the IResBlock <n_rep> times, in series.
+#
+#     1. If downsample is true then only the first repetition is down-sampled,
+#        the others are not.
+#     2. The first block uses in_channel as the input channel, all other
+#        blocks use out_channel as the output channel.
+#     """
+#
+#     def __init__(self,
+#                  n_rep: int,
+#                  in_channels: int,
+#                  out_channels: int,
+#                  in_resolution: int,
+#                  kernel_size: [3, 5, 7] = 3,
+#                  downsample: bool = False,
+#                  expand=True,
+#                  squeeze_and_excite: bool = True):
+#         super().__init__()
+#         self.blocks = []
+#         resolution = in_resolution // 2 if downsample else in_resolution
+#         for idx in range(n_rep):
+#             self.blocks.append(IResBlock(
+#                 in_channels if idx == 0 else out_channels,
+#                 out_channels,
+#                 in_resolution if idx == 0 else resolution,
+#                 kernel_size,
+#                 downsample if idx == 0 else False,
+#                 expand,
+#                 squeeze_and_excite
+#             ))
+#
+#     def forward(self, x):
+#         for block in self.blocks:
+#             x = block(x)
+#         return x
 
 
 class IResBlock(nn.Module, ABC):
@@ -124,8 +158,6 @@ class IResBlock(nn.Module, ABC):
         squeeze: if the squeeze and excite step should be applied
             (squeeze factor is 1/4)
     """
-
-    BATCH_NORM = {'momentum': 0.99, 'eps': 1e-3}
 
     SQUEEZE = 0.25
 
@@ -180,7 +212,8 @@ class IResBlock(nn.Module, ABC):
                           out_channels=ci * ch_depth,
                           kernel_size=1,
                           bias=False),
-                nn.BatchNorm2d(num_features=ci * ch_depth, **self.BATCH_NORM),
+                nn.BatchNorm2d(num_features=ci * ch_depth,
+                               **settings.batch_norm),
                 nn.Hardswish()
             )
 
@@ -193,7 +226,7 @@ class IResBlock(nn.Module, ABC):
                  stride=self.stride,
                  padding=self.padding,
                  bias=False),
-            nn.BatchNorm2d(num_features=ci * ch_depth, **self.BATCH_NORM),
+            nn.BatchNorm2d(num_features=ci * ch_depth, **settings.batch_norm),
             nn.Hardswish()
         )
 
@@ -218,7 +251,7 @@ class IResBlock(nn.Module, ABC):
                       out_channels=co,
                       kernel_size=1,
                       bias=False),
-            nn.BatchNorm2d(num_features=co, **self.BATCH_NORM),
+            nn.BatchNorm2d(num_features=co, **settings.batch_norm),
             nn.Hardswish()
         )
 
@@ -287,29 +320,3 @@ class TransposeResNetBlock(nn.Module, ABC):
         x = r + i
         x = self.relu(x)
         return x
-
-# class ResNetBlock(nn.Module, ABC):
-#
-#     def __init__(self, filter_in, filter_out, downsample=True):
-#         super().__init__()
-#         if downsample:
-#             self.conv1 = nn.Conv2d(filter_in, filter_out, kernel_size=3,
-#             stride=2, padding=1, bias=False)
-#             # self.residual = nn.Conv2d(filter_in, filter_out,
-#             kernel_size=1, stride=2, padding=0, bias=False)
-#             self.identity = nn.AvgPool2d(kernel_size=1, stride=2)
-#         else:
-#             self.conv1 = nn.Conv2d(filter_in, filter_out, kernel_size=3,
-#             stride=1, padding=1, bias=False)
-#             # self.residual = nn.Conv2d(filter_in, filter_out,
-#             kernel_size=1, stride=1, padding=0, bias=False)
-#         self.bn = nn.BatchNorm2d(filter_out)
-#         self.relu = nn.ReLU()
-#         self.conv2 = nn.Conv2d(filter_out, filter_out, kernel_size=3,
-#         stride=1, padding=1, bias=False)
-#
-#     def forward(self, x):
-#         x = self.conv1(x)
-#         x = self.bn(x)
-#         x = self.relu(x)
-#         pass

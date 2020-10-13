@@ -8,10 +8,34 @@ from util.design import Design
 from util.log import Log
 from util.dataset import Dataset
 import numpy as np
+import argparse
 
-# modelname = Design.get_available_modelnames()[0]
-modelname = 'ResNetAE1'
+# on the server, the partition id is passed as an argument
+if settings.is_running_on_desktop:
+    partition_id = 0
+    job_id = 1
+    n_cpus = 4
+    n_gpus = 1
+else:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--partition_id", help="server partition id", type=int)
+    parser.add_argument('--job_id', help='job id', type=int)
+    parser.add_argument('--n_cpus', help='number of cpus assigned', type=int)
+    parser.add_argument('--n_gpus', help='number of gpus assigned', type=int)
+    partition_id = parser.parse_args().partition_id
+    job_id = parser.parse_args().job_id
+    n_cpus = parser.parse_args().n_cpus
+    n_gpus = parser.parse_args().n_gpus
 
+# models to be run
+modelname = ['ResNetAE1', 'ConvAE1', 'DenseAE1'][job_id]
+
+# set/create root path from modelname
+settings.progress_settings.path += '/' + modelname
+if not Path(settings.progress_settings.path).exists():
+    Path(settings.progress_settings.path).mkdir()
+
+# create log
 log = Log(settings.directory_log, save_log=settings.save_log)
 
 # setup dataset (ds) and dataloader (dl)

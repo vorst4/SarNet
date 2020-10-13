@@ -1,7 +1,6 @@
 import torch.nn as nn
 from abc import ABC
 from .blocks import Reshape
-from .blocks import SimplifiedEncoder
 
 
 class ConvAE2(nn.Module, ABC):

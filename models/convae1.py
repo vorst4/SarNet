@@ -1,7 +1,7 @@
 from abc import ABC
 import torch.nn as nn
 from .blocks import Reshape
-from .blocks import SimplifiedEncoder
+from .blocks import ConvBnHs, Combine, LinBnHs, IResBlock
 
 
 class ConvAE1(nn.Module, ABC):
@@ -20,42 +20,40 @@ class ConvAE1(nn.Module, ABC):
 
         # layers
         self.encoder = nn.Sequential(
-            # 3 x 64 x 64 ->
+            # Use just a convolutional layer for the first layer
+            IResBlock(ci=3, co=32, ri=64, k=3, expand=False, squeeze=False),
+            IResBlock(ci=32, co=64, ri=64, k=3, downsample=True),
+            IResBlock(ci=64, co=96, ri=32, k=5, downsample=True),
+            IResBlock(ci=96, co=128, ri=16, k=3, downsample=True),
+            IResBlock(ci=128, co=256, ri=8, k=5, downsample=True),
+            IResBlock(ci=256, co=512, ri=4, k=3, downsample=True),
+            IResBlock(ci=512, co=1024, ri=2, k=3, downsample=True),
         )
+
+        # combination of encoder and meta-data input
+        self.combine = Combine()
+
+        # bottleneck
+        ch = 1024
         self.bottleneck = nn.Sequential(
-            nn.Linear(2, channels),
-            nn.BatchNorm1d(channels),
-            nn.ReLU())
+            LinBnHs(ci=1024 * 1 + 24, co=ch),
+            LinBnHs(co=ch),
+            LinBnHs(co=ch * 2)
+        )
+
         self.decoder = nn.Sequential(
-
-            # -> 1024x1x1
-            Reshape((-1, channels, 1, 1)),
-
-            # 1024x1x1 -> 512x2x2
-            nn.ConvTranspose2d(channels, channels // 2, 2, stride=2),
-            nn.BatchNorm2d(channels // 2),
-            nn.ReLU(),
-
-            # -> 256x4x4
-            nn.ConvTranspose2d(channels // 2, channels // 4, 2, stride=2),
-            nn.BatchNorm2d(channels // 4),
-            nn.ReLU(),
-
-            # -> 128x8x8
-            nn.ConvTranspose2d(channels // 4, channels // 8, 2, stride=2),
-            nn.BatchNorm2d(channels // 8),
-            nn.ReLU(),
-
-            # -> 64x16x16
-            nn.ConvTranspose2d(channels // 8, channels // 16, 2, stride=2),
-            nn.BatchNorm2d(channels // 16),
-            nn.ReLU(),
-
-            # -> 1x32x32
-            nn.ConvTranspose2d(channels // 16, 1, 2, stride=2)
+            Reshape(channels=512, resolution=2),
+            ConvBnHs(ci=512, co=256, k=3, s=2, t=True),  # 2 -> 4
+            ConvBnHs(co=256, k=3, s=2, t=True),  # -> 8
+            ConvBnHs(co=128, k=5, s=2, t=True),  # -> 16
+            ConvBnHs(co=64, k=5, s=2, t=True),  # -> 32
+            ConvBnHs(co=32, k=3, s=2, t=True),  # -> 64
+            nn.Conv2d(32, 1, 3, padding=1),
         )
 
     def forward(self, input_img, input_meta):
-        x = self.encoder(input_img, input_meta)
+        x = self.encoder(input_img)
+        x = self.combine(x, input_meta)
         x = self.bottleneck(x)
-        return self.decoder(x)
+        x = self.decoder(x)
+        return x
