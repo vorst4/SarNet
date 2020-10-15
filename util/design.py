@@ -432,7 +432,7 @@ class Design:
                 self._timer = time()
                 self.saved_after_epoch = False
                 # update progress (& save)
-                progress(yt, yp, mse_batch=mse)
+                progress(yt, yp, mse_batch=loss)
 
         return mse
 
