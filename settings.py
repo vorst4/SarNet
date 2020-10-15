@@ -10,7 +10,7 @@ if is_running_on_desktop:
     # misc
     directory_log = 'output'
     save_log = False
-    train_pct = 90  # in percent
+    train_pct = 98  # in percent
     path_dataset = 'C:/Users/Dennis/Documents/dataset_sar/dataset.csv'
     batch_size = 20
     len_dataset = 10000
@@ -41,7 +41,7 @@ else:
     # misc
     directory_log = 'output'
     save_log = True
-    train_pct = 90  # in percent
+    train_pct = 98  # in percent
     batch_size = 100
     path_dataset = 'dataset_sar/dataset.csv'
     len_dataset = None
@@ -58,7 +58,7 @@ else:
         save_design=True,
         load_design=True,
         save_interval=15,
-        path='/home/tue/s111167/trained_models',
+        path='/home/tue/s111167/trained_models_gpu',
         save_lossplot=True,
         save_preview=True,
     )
