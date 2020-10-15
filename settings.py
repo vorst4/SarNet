@@ -42,7 +42,7 @@ else:
     directory_log = 'output'
     save_log = True
     train_pct = 90  # in percent
-    batch_size = 302
+    batch_size = 100
     path_dataset = 'dataset_sar/dataset.csv'
     len_dataset = None
 

@@ -12,8 +12,8 @@ from util.log import Log
 
 # on the server, the partition id is passed as an argument
 if settings.is_running_on_desktop:
-    partition_id = 2
-    job_id = 1
+    partition_id = 0
+    job_id = 0
     n_cpus = 4
     n_gpus = 1
 else:

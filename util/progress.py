@@ -184,11 +184,11 @@ class Progress:
             plt.axis('off')
             plt.show()
 
-    def __call__(self, yt_val, yp_val):
+    def __call__(self, yt_val, yp_val, mse_batch=None):
 
         # print progress, if desired
         if self.settings.print:
-            self._print()
+            self._print(mse_batch)
 
         # save design, if path is given
         if self.settings.save_design:
@@ -204,7 +204,8 @@ class Progress:
                                      backups=self.path_best_design_backup)
 
         # lossplot
-        if self.settings.lossplot or self.settings.save_lossplot:
+        if self.settings.lossplot or self.settings.save_lossplot and \
+                self.design.saved_after_epoch:
             self._lossplot()
 
         # preview
@@ -251,7 +252,7 @@ class Progress:
             'preview': settings.path.joinpath(settings.subdir_preview),
         }
 
-    def _print(self):
+    def _print(self, mse_batch):
         """
         Print progress
         """
@@ -259,13 +260,20 @@ class Progress:
         es = self.design.get_epoch_stop()
         bi = self.design.idx_batch
         bt = self.design.n_batches
-        _, lt = self.design.get_train_mse_per_epoch()
-        lt = lt[-1]
-        _, lv = self.design.get_valid_mse_per_epoch()
-        lv = lv[-1]
-        self.log.logprint(
-            'Epoch:%3.0f/%i, Batch:%i/%i, loss_train: %3.6f, loss_val: %3.6f'
-            % (ec, es, bi, bt, lt, lv))
+        if mse_batch is None:
+            _, lt = self.design.get_train_mse_per_epoch()
+            lt = lt[-1]
+            _, lv = self.design.get_valid_mse_per_epoch()
+            lv = lv[-1]
+            self.log.logprint(
+                'Epoch:%3.0f/%i, Batch:%i/%i, loss_train: %3.12f, loss_val: '
+                '%3.12f' % (ec, es, bi, bt, lt, lv)
+            )
+        else:
+            self.log.logprint(
+                'Epoch:%3.0f/%i, Batch:% 3i/%i, mse_batch: %3.12f'
+                % (ec-1, es, bi, bt, mse_batch)
+            )
 
     def _lossplot(self):
         """
