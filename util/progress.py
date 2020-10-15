@@ -272,7 +272,7 @@ class Progress:
         else:
             self.log.logprint(
                 'Epoch:%3.0f/%i, Batch:% 3i/%i, mse_batch: %3.12f'
-                % (ec-1, es, bi, bt, mse_batch)
+                % (ec - 1, es, bi, bt, mse_batch)
             )
 
     def _lossplot(self):
