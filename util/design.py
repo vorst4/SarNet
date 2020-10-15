@@ -1,19 +1,22 @@
+import abc
 import json
+import os
 from pathlib import Path
+from time import time
 from typing import Union, List, Tuple
-import numpy as np
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim
 import torch.utils.data
 from torch.utils.data import DataLoader, Subset
 
-from .performance import PerformanceParameter2D, PerformanceParameter3D
+import models
 from .dataset import Dataset
 from .log import Log
+from .performance import PerformanceParameter2D, PerformanceParameter3D
 from .progress import Progress
-from models import *  # IMPORTANT: do NOT remove
 
 
 class Design:
@@ -50,7 +53,7 @@ class Design:
         self._loss_function = None
         self._optimizer = None
         self._lr_sched = None
-        self._log = None
+        self._log: Log = None
         self._epoch_start = None
         self._epoch_current = None
         self._epoch_stop = None
@@ -58,6 +61,10 @@ class Design:
         self._valid_mse_per_epoch = None
         self._valid_mse_per_phase_per_epoch = None
         self._valid_tae_per_phase_per_epoch = None
+        self._timer = None
+        self.saved_after_epoch = None
+        self.n_batches = None
+        self.idx_batch = None
         torch.manual_seed(self._torch_seed)
 
     def create(self,
@@ -105,8 +112,10 @@ class Design:
             parameter.numel() for parameter in self._model.parameters())
         log.logprint('  number of model parameters: %s' %
                      '{:,}'.format(n_parameters))
+        log.logprint('  memory usage (cpu): ' + log.memory_usage())
         if torch.cuda.is_available():
-            log.logprint('  memory usage: \n' + torch.cuda.memory_summary())
+            log.logprint('  memory usage (gpu): \n' +
+                         torch.cuda.memory_summary())
 
         return self
 
@@ -155,22 +164,20 @@ class Design:
         returns modelnames of models that are available
         """
         modelnames = []
-        # loop through global variables
-        for key, val in globals().items():
-            if str(val)[8:14] == 'models':
-                modelnames.append(key)
+        for att in dir(models):
+            if att[0] != '_' and isinstance(getattr(models, att), abc.ABCMeta):
+                modelnames.append(att)
         return tuple(modelnames)
 
     @classmethod
     def get_ideal_learning_rates(cls) -> dict:
-        models = cls.get_available_modelnames()
         lrs = {}
-        for model_name in models:
-            model = globals()[model_name]()
+        for name in cls.get_available_modelnames():
+            model = getattr(models, name)
             lr = None
             if hasattr(model, 'lr_ideal'):
                 lr = model.lr_ideal
-            lrs.update({model_name: lr})
+            lrs[name] = lr
         return lrs
 
     @classmethod
@@ -183,17 +190,17 @@ class Design:
                 'ERROR: model name: "%s" is not one of the available '
                 'models: %s' %
                 (name, str(cls.get_available_modelnames())))
-        return globals()[name]()
+        return getattr(models, name)()
 
     @classmethod
     def get_models_from_names(cls, names: List[str]) -> List[nn.Module]:
         """
         If given list of names are models, list of models is returned
         """
-        models = []
+        models_ = []
         for name in names:
-            models.append(cls.get_model_from_name(name))
-        return models
+            models_.append(cls.get_model_from_name(name))
+        return models_
 
     @classmethod
     def get_default_dataloaders(
@@ -231,10 +238,17 @@ class Design:
         self._valid_mse_per_phase_per_epoch.allocate(self.n_phase * epoch_stop)
         self._valid_tae_per_phase_per_epoch.allocate(self.n_phase * epoch_stop)
 
-    def save(self, path, name=None):
+    def save(self, path, name=None, backups: List[Path] = None):
         """
         Save model to <path>, the filename can either be included in <path>
         or provided separately as <name>
+
+        There is also the option for backups, reason being that terminating the
+        script while the model is being saved results in a corrupted file.
+        <backups> should be a list of pathlib.Path, with each Path being the
+        path of the backup file. More concretely, the last backup (backup[-1])
+        will be deleted, backups[idx] are renamed to backups[idx+1], and
+        path (+name) is renamed to backup[0].
         """
 
         # if path is string, convert it to pathlib.Path
@@ -245,10 +259,29 @@ class Design:
         if name is not None:
             path = path.joinpath(name)
 
+        # manage backups
+        if backups is not None:
+
+            # remove oldest backup
+            if backups[-1].exists():
+                os.remove(backups[-1])
+
+            # rename other backups (if they exist)
+            for idx in range(len(backups) - 2, -1, -1):
+                if backups[idx].exists():
+                    backups[idx].rename(backups[idx + 1])
+
+            # create backup from given path
+            if path.exists():
+                path.rename(backups[0])
+
         # save
         torch.save(self._to_dict(), path)
 
-    def load(self, file: Union[str, Path], dl_train: DataLoader,
+    def load(self,
+             file: Union[str, Path],
+             backup: Union[str, Path],
+             dl_train: DataLoader,
              dl_val: DataLoader, log: Log):
         """
         Load Design class from <file>, also set the new number of <epochs>
@@ -264,7 +297,22 @@ class Design:
             raise Exception('ERROR: file: "%s" does not exist' % str(file))
 
         # load file
-        self._from_dict(torch.load(file, map_location=torch.device('cpu')))
+        try:
+            self._from_dict(torch.load(file,
+                                       map_location=torch.device('cpu')))
+        except RuntimeError:
+            # if failed, try loading the backup
+            print('WARNING: loading file %s failed, trying to load backup' %
+                  file)
+            if isinstance(backup, str):
+                backup = Path(backup)
+            if not backup.exists():
+                raise Exception('ERROR: could not load file %s and backup %s'
+                                ' does not exist' % (file, backup))
+
+            self._from_dict(torch.load(backup,
+                                       map_location=torch.device('cpu')))
+            print('INFO: successfully loaded backup')
 
         # set non serializable attributes
         self._log = log
@@ -286,12 +334,16 @@ class Design:
 
         # initialize progress display/saver
         res_img_out = self._dl_train.dataset.shapes[Dataset.KEY.OUTPUT][1]
-        progress = Progress(progress_settings, self, self._log, res_img_out)
+        progress = Progress(progress_settings, self, self._log,
+                            res_img_out)
 
         # load previous model state if needed
         if progress.load_design:
             if progress.path_design.exists():
-                self.load(progress.path_design, self._dl_train, self._dl_val,
+                self.load(progress.path_design,
+                          progress.path_design_backup[0],
+                          self._dl_train,
+                          self._dl_val,
                           self._log)
 
         # reset starting epoch
@@ -300,10 +352,13 @@ class Design:
         # move model to gpu/cpu
         self._model = self._model.to(device=self.device)
 
+        # start timer
+        self._timer = time()
+
         # loop over epochs
         for self._epoch_current in range(self._epoch_start, self._epoch_stop):
             # train
-            mse_train = self._train()
+            mse_train = self.train_1epoch(progress)
 
             # evaluate
             img_true, img_pred, mse_valid, mse_p, tae_p = self._evaluate()
@@ -326,6 +381,7 @@ class Design:
             #   img_true and img_pred are the true and predicted images of
             #   the last batch, these are used for the
             #   preview
+            self.saved_after_epoch = True
             progress(img_true, img_pred)
 
             # # update learning rate
@@ -339,21 +395,20 @@ class Design:
         # move model back to cpu
         self._model = self._model.cpu()
 
-    def _train(self):
+    def train_1epoch(self, progress: Progress):
         """
         Train model for 1 epoch
         """
 
-        n_batches = len(self._dl_train)
+        self.n_batches = len(self._dl_train)
         mse = 0.0
 
         # loop over batches
-        for idx_batch, data in enumerate(self._dl_train):
+        for self.idx_batch, data in enumerate(self._dl_train):
             # make sure model is in train mode
             self._model.train()
 
             # abbreviate variables and move them to <device>
-
             kwargs = {'device': self.device, 'dtype': self.dtype}
             yt = data[Dataset.KEY.OUTPUT].to(**kwargs)
             x_img = data[Dataset.KEY.INPUT_IMG].to(**kwargs)
@@ -369,7 +424,15 @@ class Design:
             # update model parameters using the gradient
             self._optimizer.step()
 
-            mse += loss.cpu().detach().item() / n_batches
+            mse += loss.cpu().detach().item() / self.n_batches
+
+            # save model if interval has passed (and reset timer)
+            if (time() - self._timer) / 60 > \
+                    progress.settings.save_interval:
+                self._timer = time()
+                self.saved_after_epoch = False
+                # update progress (& save)
+                progress(yt, yp)
 
         return mse
 

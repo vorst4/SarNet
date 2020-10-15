@@ -1,18 +1,18 @@
+import argparse
+from pathlib import Path
+
+import torch
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
-import torch
-import pathlib
-from pathlib import Path
+
 import settings
+from util.dataset import Dataset
 from util.design import Design
 from util.log import Log
-from util.dataset import Dataset
-import numpy as np
-import argparse
 
 # on the server, the partition id is passed as an argument
 if settings.is_running_on_desktop:
-    partition_id = 0
+    partition_id = 2
     job_id = 1
     n_cpus = 4
     n_gpus = 1
@@ -36,7 +36,9 @@ if not Path(settings.progress_settings.path).exists():
     Path(settings.progress_settings.path).mkdir()
 
 # create log
-log = Log(settings.directory_log, save_log=settings.save_log)
+log = Log(directory=settings.directory_log,
+          prefix='log_%i_' % job_id,
+          save_log=settings.save_log)
 
 # setup dataset (ds) and dataloader (dl)
 ds = Dataset(settings.path_dataset, n_max=settings.len_dataset)

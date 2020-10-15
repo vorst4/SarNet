@@ -1,4 +1,5 @@
-from typing import List, Union, Tuple
+from typing import Tuple
+
 import numpy as np
 
 
@@ -14,7 +15,8 @@ class PerformanceParameter2D:
 
     @classmethod
     def load(cls, dictionary: dict):
-        obj = cls(dictionary['x_label'], dictionary['y_label'], dictionary['size'])
+        obj = cls(dictionary['x_label'], dictionary['y_label'],
+                  dictionary['size'])
         obj.x = dictionary['x']
         obj.y = dictionary['y']
         obj.idx = dictionary['idx']
@@ -61,7 +63,8 @@ class PerformanceParameter2D:
 
 class PerformanceParameter3D:
 
-    def __init__(self, x_label: str, y_label: str, z_label: str, sizes: Tuple[int, int]):
+    def __init__(self, x_label: str, y_label: str, z_label: str,
+                 sizes: Tuple[int, int]):
         self.x_label = x_label
         self.y_label = y_label
         self.z_label = z_label
@@ -73,7 +76,8 @@ class PerformanceParameter3D:
 
     @classmethod
     def load(cls, dictionary: dict):
-        obj = cls(dictionary['x_label'], dictionary['y_label'], dictionary['z_label'], dictionary['size'])
+        obj = cls(dictionary['x_label'], dictionary['y_label'],
+                  dictionary['z_label'], dictionary['size'])
         obj.x = dictionary['x']
         obj.y = dictionary['y']
         obj.z = dictionary['z']

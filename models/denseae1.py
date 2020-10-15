@@ -1,5 +1,7 @@
 from abc import ABC
+
 import torch.nn as nn
+
 from .blocks import Reshape, IResBlock, Combine, LinBnHs
 
 
@@ -36,7 +38,7 @@ class DenseAE1(nn.Module, ABC):
             LinBnHs(ci=ch * 1 + 24, co=ch),
             LinBnHs(co=ch),
             LinBnHs(co=ch * 2),
-            LinBnHs(co=64*64),
+            LinBnHs(co=64 * 64),
             Reshape(channels=1, resolution=64)
         )
 

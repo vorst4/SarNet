@@ -1,7 +1,8 @@
-import torch
-import matplotlib.pyplot as plt
-import numpy as np
 from pathlib import Path
+
+import matplotlib.pyplot as plt
+import torch
+
 from .design import Design
 from .progress import Progress
 

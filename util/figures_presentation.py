@@ -1,10 +1,12 @@
+from pathlib import Path
+from typing import Union, List
+
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from typing import Union, List
-from pathlib import Path
+
 from .design import Design
 from .log import Log
-import matplotlib.pyplot as plt
 
 IEEE_FONTSIZE = 8
 IEEE_FONTSIZE_SMALL = 8
@@ -78,15 +80,18 @@ def _get_square_aspect(axis: plt.Axes, log10=True):
 
 def _remap(array, indexes1: List[int], indexes2: List[int]):
     for ii in range(len(indexes1)):
-        array[indexes1[ii]], array[indexes2[ii]] = array[indexes2[ii]], array[indexes1[ii]]
+        array[indexes1[ii]], array[indexes2[ii]] = array[indexes2[ii]], array[
+            indexes1[ii]]
     return array
 
 
 def figures_presentation(paths_design: List[Path],
                          dir_dst: Union[Path, str],
                          dir_gif: Union[Path, str],
-                         fn_train_mse_epoch: Union[Path, str] = 'train_mse_epoch.svg',
-                         fn_valid_mse_epoch: Union[Path, str] = 'valid_mse_epoch.svg',
+                         fn_train_mse_epoch: Union[
+                             Path, str] = 'train_mse_epoch.svg',
+                         fn_valid_mse_epoch: Union[
+                             Path, str] = 'valid_mse_epoch.svg',
                          fn_mse_phase: Union[Path, str] = 'mse_phase.svg',
                          fn_tae_phase: Union[Path, str] = 'tae_phase.svg',
                          show: bool = True
@@ -98,15 +103,16 @@ def figures_presentation(paths_design: List[Path],
     if isinstance(dir_gif, str):
         dir_gif = Path(dir_gif)
 
-
     # get modelnames and load designs
     log = Log('output', save_log=False)
     dlt, dlv = Design.get_default_dataloaders('data/dataset.csv', 1)
     designs = [Design().load(path, dlt, dlv, log) for path in paths_design]
-    modelnames = [str(path.parents[0]).split('\\')[-1] for path in paths_design]
+    modelnames = [str(path.parents[0]).split('\\')[-1] for path in
+                  paths_design]
 
     # change modelnames
-    modelnames = [modelname.replace('AE', '').replace('Info', 'Conv3') for modelname in modelnames]
+    modelnames = [modelname.replace('AE', '').replace('Info', 'Conv3') for
+                  modelname in modelnames]
 
     # change order of designs/modelnames
     # ids_from = [0, -1, -1, -2, -1]
@@ -128,7 +134,8 @@ def figures_presentation(paths_design: List[Path],
 
     # create and save figures
     _change_default_figure_settings()
-    _mse_epoch(designs, modelnames, (dir_dst.joinpath(fn_train_mse_epoch), dir_dst.joinpath(fn_valid_mse_epoch)))
+    _mse_epoch(designs, modelnames, (dir_dst.joinpath(fn_train_mse_epoch),
+                                     dir_dst.joinpath(fn_valid_mse_epoch)))
     _mse_phase(mse, modelnames, dir_dst.joinpath(fn_mse_phase))
     _tae_phase(tae, modelnames, dir_dst.joinpath(fn_tae_phase))
 
@@ -137,7 +144,8 @@ def figures_presentation(paths_design: List[Path],
         _gif_from_tensor(imgs_p_, dir_gif.joinpath(modelname + 'pred.gif'))
         _gif_from_tensor(imgs_t_, dir_gif.joinpath(modelname + 'true.gif'))
         max_tae = max([t.max() for t in imgs_ae])
-        _gif_from_tensor(imgs_ae_ / max_tae, dir_gif.joinpath(modelname + 'error.gif'))
+        _gif_from_tensor(imgs_ae_ / max_tae,
+                         dir_gif.joinpath(modelname + 'error.gif'))
 
     if show:
         plt.show()
@@ -145,7 +153,9 @@ def figures_presentation(paths_design: List[Path],
 
 def _gif_from_tensor(tensor: torch.Tensor, dst: Path):
     from array2gif import write_gif
-    np_gif = np.tile(np.array(tensor.clamp(0, 1) * 255, dtype=int).swapaxes(1, -1), (1, 1, 1, 3))
+    np_gif = np.tile(
+        np.array(tensor.clamp(0, 1) * 255, dtype=int).swapaxes(1, -1),
+        (1, 1, 1, 3))
     gif = [np_gif[idx, :, :, :] for idx in range(np_gif.shape[0])]
     write_gif(gif, dst, fps=50)
 
@@ -174,7 +184,8 @@ def _mse_epoch(designs, modelnames, paths_mse_epoch):
     for idx in (0, 1):
         plt.figure(num=paths_mse_epoch[idx].stem)
         for idx2, modelname in enumerate(modelnames):
-            plt.semilogy(x * ITER_PER_EPOCH / 1000, y[idx][idx2], '.', markersize=1, label=modelname)
+            plt.semilogy(x * ITER_PER_EPOCH / 1000, y[idx][idx2], '.',
+                         markersize=1, label=modelname)
         plt.title(titles[idx])
         plt.xlabel('x1000 iterations')
         plt.ylabel('mean squared error')
@@ -226,9 +237,11 @@ def _evaluate(design):
         # loop over the evaluation dataset
         for idx_batch, data in enumerate(design._dl_val):
             # abbreviate variables and move to <device>
-            yt = data['output_img'].to(device=design.device, dtype=design.dtype)
+            yt = data['output_img'].to(device=design.device,
+                                       dtype=design.dtype)
             x1 = data['input_img'].to(device=design.device, dtype=design.dtype)
-            x2 = data['input_meta'].to(device=design.device, dtype=design.dtype)
+            x2 = data['input_meta'].to(device=design.device,
+                                       dtype=design.dtype)
 
             yp = design._model(x1, x2).cpu().detach()
 

@@ -1,5 +1,7 @@
-import torch.nn as nn
 from abc import ABC
+
+import torch.nn as nn
+
 from .blocks import Reshape, IResBlock, Combine, LinBnHs
 
 

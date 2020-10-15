@@ -1,7 +1,9 @@
 from abc import ABC
+
 import torch.nn as nn
-from .blocks import Reshape
+
 from .blocks import ConvBnHs, Combine, LinBnHs, IResBlock
+from .blocks import Reshape
 
 
 class ConvAE1(nn.Module, ABC):

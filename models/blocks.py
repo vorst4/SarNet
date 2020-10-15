@@ -1,6 +1,8 @@
+from abc import ABC
+
 import torch
 import torch.nn as nn
-from abc import ABC
+
 import settings
 
 _last_channels_out = None

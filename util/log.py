@@ -1,5 +1,8 @@
+import os
 from datetime import datetime
 from pathlib import Path
+
+import psutil
 
 
 class Log:
@@ -80,3 +83,16 @@ class Log:
 
                 # write the line
                 log.write(line + '\n')
+
+    @staticmethod
+    def memory_usage() -> str:
+        mem = psutil.virtual_memory()
+        used_sys = '{:,}MB'.format(int(mem.used / 1024 ** 2))
+        used_py = '{:,}MB'.format(
+            int(psutil.Process(os.getpid()).memory_info().rss / 1024 ** 2)
+        )
+        free = '{:,}MB'.format(int(mem.free / 1024 ** 2))
+        pct = '%.1f' % mem.percent
+        string = 'used_sys=%s, used_py=%s, free=%s, pct=%s' % \
+                 (used_sys, used_py, free, pct)
+        return string
