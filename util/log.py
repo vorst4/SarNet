@@ -13,7 +13,7 @@ class Log:
     logfile.
     """
 
-    def __init__(self, directory, prefix='log_', save_log=True):
+    def __init__(self, directory, prefix='log_', save_log=False):
 
         # skip initialization if log does not have to be saved
         self.save_log = save_log

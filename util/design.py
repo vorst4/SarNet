@@ -21,6 +21,10 @@ from util.performance import Performance
 from .progress import Progress
 
 
+def _get_gpu_mem(device_id):
+    return torch.cuda.get_device_properties(device_id).total_memory()
+
+
 class Design:
     """
     The 'design' combines the model, optimiser, loss_function, data loaders,
@@ -108,6 +112,7 @@ class Design:
                      '{:,}'.format(n_parameters))
         log.logprint('  memory usage (cpu): ' + log.memory_usage())
         if torch.cuda.is_available():
+            log.logprint('  memory available (gpu): %i' % _get_gpu_mem(0))
             log.logprint('  memory usage (gpu): \n' +
                          torch.cuda.memory_summary())
 
@@ -464,7 +469,7 @@ class Design:
             # calculate gradient (a.k.a. backward propagation)
             timer_.start()
             loss.backward()
-            timer_.stop('\tcalculated gradient')
+            timer_.stop('\tcalculated backward propagation')
 
             # update model parameters using the gradient
             timer_.start()

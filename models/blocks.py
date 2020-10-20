@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 
 import settings
+from util.timer import Timer
+from util.log import Log
 
 _last_channels_out = None
 
@@ -268,33 +270,52 @@ class IResBlock(nn.Module, ABC):
 
     @staticmethod
     def transpose_conv(**kwargs):
-        return nn.ConvTranspose2d(**kwargs, output_padding=1)
+        p = 0 if (0.5 * kwargs['kernel_size']).is_integer() else 1
+        return nn.ConvTranspose2d(**kwargs, output_padding=p)
 
     class _Excite:
         def __call__(self, x_squeezed, x):
             return torch.sigmoid(x_squeezed) * x
 
     def forward(self, x):
+        # timer = Timer(Log(None))  # todo: remove
+        # timer2 = Timer(Log(None)).start()  # todo: remove
+
         i = x  # identity
 
         # apply expansion
+        # timer.start()
         if self.expand:
             x = self.expand_conv(x)
+        # timer.stop('\t\t\tforwarded through expansion')
 
         # apply depth-wise convolution
+        # timer.start()
         x = self.depth_conv(x)
+        # timer.stop('\t\t\tforwarded through depth-wise conv')
 
         # squeeze & excite
         if self.squeeze_and_excite:
+            # timer.start()
             x = self.excite(self.squeeze(x), x)
+            # timer.stop('\t\t\tforwarded through squeeze & excite')
 
         # project the expanded convolution back to a narrow one
+        # timer.start()
         x = self.project(x)
+        # timer.stop('\t\t\tforwarded through projection')
 
         # add identity to x, upsample/downsample it if required
+        # timer.start()
         if self.upsample or self.downsample or self.ci != self.co:
+            # x = x + self.identity(i)
+            # timer.stop('\t\t\tforwarded : added (changed) identity')
+            # timer2.stop('\t\t\tforwarded: inverse resnet block')
             return x + self.identity(i)
         else:
+            # x = x + i
+            # timer2.stop('\t\t\tforwarded: inverse resnet block')
+            # timer.stop('\t\t\tforwarded: added (unchanged) identity')
             return x + i
 
 
@@ -322,3 +343,22 @@ class TransposeResNetBlock(nn.Module, ABC):
         x = r + i
         x = self.relu(x)
         return x
+
+
+class InverseResidualEncoder(nn.Module, ABC):
+
+    def __init__(self):
+        super().__init__()
+        self.encoder = nn.Sequential(
+            # Use just a convolutional layer for the first layer
+            IResBlock(ci=3, co=32, ri=64, k=3, expand=False, squeeze=False),
+            IResBlock(ci=32, co=64, ri=64, k=3, expand=False, downsample=True),
+            IResBlock(ci=64, co=96, ri=32, k=5, downsample=True),
+            IResBlock(ci=96, co=128, ri=16, k=3, downsample=True),
+            IResBlock(ci=128, co=256, ri=8, k=5, downsample=True),
+            IResBlock(ci=256, co=512, ri=4, k=3, downsample=True),
+            IResBlock(ci=512, co=1024, ri=2, k=3, downsample=True),
+        )
+
+    def forward(self, x):
+        return self.encoder(x)

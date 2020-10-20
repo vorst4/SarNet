@@ -1,11 +1,15 @@
 from time import time
 import settings
+from util.log import Log
 
 
 class Timer:
     def __init__(self, log):
         self.timer = time()
-        self.log = log
+        if log is None:
+            self.log = Log(None, save_log=False)
+        else:
+            self.log = log
 
     def start(self):
         self.timer = time()

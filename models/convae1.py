@@ -2,8 +2,10 @@ from abc import ABC
 
 import torch.nn as nn
 
-from .blocks import ConvBnHs, Combine, LinBnHs, IResBlock
-from .blocks import Reshape
+from .blocks import ConvBnHs, Combine, LinBnHs, IResBlock, Reshape, \
+    InverseResidualEncoder
+from util.timer import Timer
+from util.log import Log
 
 
 class ConvAE1(nn.Module, ABC):
@@ -21,16 +23,7 @@ class ConvAE1(nn.Module, ABC):
         channels = 1024
 
         # layers
-        self.encoder = nn.Sequential(
-            # Use just a convolutional layer for the first layer
-            IResBlock(ci=3, co=32, ri=64, k=3, expand=False, squeeze=False),
-            IResBlock(ci=32, co=64, ri=64, k=3, downsample=True),
-            IResBlock(ci=64, co=96, ri=32, k=5, downsample=True),
-            IResBlock(ci=96, co=128, ri=16, k=3, downsample=True),
-            IResBlock(ci=128, co=256, ri=8, k=5, downsample=True),
-            IResBlock(ci=256, co=512, ri=4, k=3, downsample=True),
-            IResBlock(ci=512, co=1024, ri=2, k=3, downsample=True),
-        )
+        self.encoder = InverseResidualEncoder()
 
         # combination of encoder and meta-data input
         self.combine = Combine()
@@ -38,9 +31,7 @@ class ConvAE1(nn.Module, ABC):
         # bottleneck
         ch = 1024
         self.bottleneck = nn.Sequential(
-            LinBnHs(ci=1024 * 1 + 24, co=ch),
-            LinBnHs(co=ch),
-            LinBnHs(co=ch * 2)
+            LinBnHs(ci=1024 * 1 + 24, co=ch * 2),
         )
 
         self.decoder = nn.Sequential(
@@ -54,8 +45,16 @@ class ConvAE1(nn.Module, ABC):
         )
 
     def forward(self, input_img, input_meta):
+        timer = Timer(Log(None)).start()
         x = self.encoder(input_img)
+        timer.stop('\t\tforwarded through encoder')
+        timer.start()
         x = self.combine(x, input_meta)
+        timer.stop('\t\tforwarded through combine')
+        timer.start()
         x = self.bottleneck(x)
+        timer.stop('\t\tforwarded through bottleneck')
+        timer.start()
         x = self.decoder(x)
+        timer.stop('\t\tforwarded through decoder')
         return x

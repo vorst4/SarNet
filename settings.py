@@ -21,7 +21,7 @@ if is_running_on_desktop:
     train_pct = 90  # in percent
 
     # batch size (int)
-    batch_size = 100
+    batch_size = 128
 
     # number of train/valid subsets
     #   The evaluation set (can be) split into N unique subsets that are
@@ -54,7 +54,6 @@ if is_running_on_desktop:
         preview=False,
         load_design=False,
         save_design=False,
-        save_interval=1,
         path='C:/Users/Dennis/Documents/tmp',
         save_lossplot=False,
         save_preview=False,
@@ -77,7 +76,7 @@ else:
     train_pct = 98  # in percent
 
     # batch size (int)
-    batch_size = 100
+    batch_size = 128
 
     # number of train/valid subsets
     #   The evaluation set (can be) split into N unique subsets that are
@@ -106,7 +105,6 @@ else:
     progress_settings = Progress.Settings(
         save_design=False,
         load_design=False,
-        save_interval=15,
         path='/home/tue/s111167/trained_models_gpu',
         save_lossplot=False,
         save_preview=False,

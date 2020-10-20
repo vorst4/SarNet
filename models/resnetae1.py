@@ -2,8 +2,10 @@ from abc import ABC
 
 import torch.nn as nn
 
-from .blocks import Reshape, IResBlock, Combine, LinBnHs
-
+from .blocks import Reshape, IResBlock, Combine, LinBnHs, \
+    InverseResidualEncoder
+from util.timer import Timer
+from util.log import Log
 
 class ResNetAE1(nn.Module, ABC):
     lr_ideal = 1e-5
@@ -24,16 +26,7 @@ class ResNetAE1(nn.Module, ABC):
         #     IResBlock(ci=80, co=112, ri=8, k=5, downsample=True),
         #     IResBlock(ci=112, co=128, ri=4, k=5),
         # )
-        self.encoder = nn.Sequential(
-            # Use just a convolutional layer for the first layer
-            IResBlock(ci=3, co=32, ri=64, k=3, expand=False, squeeze=False),
-            IResBlock(ci=32, co=64, ri=64, k=3, downsample=True),
-            IResBlock(ci=64, co=96, ri=32, k=5, downsample=True),
-            IResBlock(ci=96, co=128, ri=16, k=3, downsample=True),
-            IResBlock(ci=128, co=256, ri=8, k=5, downsample=True),
-            IResBlock(ci=256, co=512, ri=4, k=3, downsample=True),
-            IResBlock(ci=512, co=1024, ri=2, k=3, downsample=True),
-        )
+        self.encoder = InverseResidualEncoder()
 
         # combination of encoder and meta-data input
         self.combine = Combine()
@@ -41,9 +34,7 @@ class ResNetAE1(nn.Module, ABC):
         # bottleneck
         ch = 1024
         self.bottleneck = nn.Sequential(
-            LinBnHs(ci=1024 * 1 + 24, co=ch),
-            LinBnHs(co=ch),
-            LinBnHs(co=ch * 2)
+            LinBnHs(ci=1024 * 1 + 24, co=ch*2),
         )
 
         # self.decoder = nn.Sequential(
@@ -60,18 +51,25 @@ class ResNetAE1(nn.Module, ABC):
 
         self.decoder = nn.Sequential(
             Reshape(channels=512, resolution=2),
-            IResBlock(ci=512, co=256, ri=2, k=3, upsample=True),
-            IResBlock(ci=256, co=128, ri=4, k=3, upsample=True),
-            IResBlock(ci=128, co=64, ri=8, k=5, upsample=True),
-            IResBlock(ci=64, co=32, ri=16, k=3, upsample=True),
-            IResBlock(ci=32, co=16, ri=32, k=3, upsample=True),
-            nn.Conv2d(16, 1, 3, padding=1)
+            IResBlock(ci=512, co=128, ri=2, k=2, expand=False, upsample=True),
+            IResBlock(ci=128, co=64, ri=4, k=2, upsample=True),
+            IResBlock(ci=64, co=32, ri=8, k=4, upsample=True),
+            IResBlock(ci=32, co=16, ri=16, k=3, upsample=True),
+            IResBlock(ci=16, co=8, ri=32, k=3, expand=False, upsample=True),
+            nn.Conv2d(8, 1, 3, padding=1)
         )
 
     def forward(self, input_img, input_meta):
+        timer = Timer(Log(None)).start()
         x = self.encoder(input_img)
-
+        timer.stop('forwarded through encoder')
+        timer.start()
         x = self.combine(x, input_meta)
+        timer.stop('forwarded through combine')
+        timer.start()
         x = self.bottleneck(x)
+        timer.stop('forwarded through bottleneck')
+        timer.start()
         x = self.decoder(x)
+        timer.stop('forwarded through decoder')
         return x
