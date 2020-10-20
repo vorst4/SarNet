@@ -21,10 +21,6 @@ from util.performance import Performance
 from .progress import Progress
 
 
-def _get_gpu_mem(device_id):
-    return torch.cuda.get_device_properties(device_id).total_memory()
-
-
 class Design:
     """
     The 'design' combines the model, optimiser, loss_function, data loaders,
@@ -100,23 +96,44 @@ class Design:
 
         # log
         # todo: expand upon information that is being logged
-        log.logprint('Created Design')
-        log.logprint('  model: ' + str(type(self._model)))
-        log.logprint('  device: ' + str(self.device))
-        log.logprint(
-            '  dataset size: %i' % len(self._dl_train[0].dataset))
-        log.logprint('  batch size: %i' % self._dl_train[0].batch_size)
-        n_parameters = sum(
-            parameter.numel() for parameter in self._model.parameters())
-        log.logprint('  number of model parameters: %s' %
-                     '{:,}'.format(n_parameters))
-        log.logprint('  memory usage (cpu): ' + log.memory_usage())
-        if torch.cuda.is_available():
-            log.logprint('  memory available (gpu): %i' % _get_gpu_mem(0))
-            log.logprint('  memory usage (gpu): \n' +
-                         torch.cuda.memory_summary())
+        log.logprint(self.info())
+        log.logprint('...don')
+        exit()
 
         return self
+
+    def info(self):
+        # number of training and validation samples per subset:
+        nt, nv = [], []
+        for dlt, dlv in zip(self._dl_train, self._dl_val):
+            nt.append(len(dlt.dataset))
+            nv.append(len(dlv.dataset))
+
+        # number of parameters
+        n_par = sum(p.numel() for p in self._model.parameters())
+
+        # create info String
+        s = ''
+        s += '  model: %s\n' % str(type(self._model))
+        s += '  device: %s\n' % str(self.device)
+        s += '  dataset:\n'
+        s += '  | number of subsets: %i\n' % settings.n_subsets
+        s += '  | size total: %i \n' % len(self._dl_train[0].dataset.dataset)
+        s += '  | size train: %i (%.0f%%) [%s]\n' % \
+             (sum(nt), settings.train_pct, ','.join(map(str, nt)))
+        s += '  | size valid: %i (%.0f%%) [%s]\n' % \
+             (sum(nv), 100 - settings.train_pct, ','.join(map(str, nv)))
+        s += '  number of model parameters: %s\n' % '{:,}'.format(n_par)
+        s += '  memory usage (cpu): %s\n' % self._log.memory_usage()
+
+        if torch.cuda.is_available():
+            mem = torch.cuda.get_device_properties(self.device).total_memory()
+            s += '  memory available (gpu): %i\n' % mem
+            # s += '  memory usage (gpu): \n' + torch.cuda.memory_summary()
+        else:
+            s += '  not using CUDA\n'
+
+        return s
 
     def get_epoch_stop(self) -> int:
         """

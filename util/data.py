@@ -152,7 +152,7 @@ class Dataset:
                 self.dataset, ids_t, trans_train
             ))
             self.validation.append(_Subset(
-                self.dataset, ids_t, trans_val
+                self.dataset, ids_v, trans_val
             ))
 
     def __len__(self):

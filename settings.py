@@ -18,7 +18,7 @@ if is_running_on_desktop:
 
     # train percentage (float): percentage of the dataset that is to be used
     #   for training, the rest is used for evaluation.
-    train_pct = 90  # in percent
+    train_pct = 99  # in percent
 
     # batch size (int)
     batch_size = 128

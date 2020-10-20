@@ -74,7 +74,7 @@ timer.start()
 ds = Dataset(
     dataset_file=settings.path_dataset,
     train_pct=settings.train_pct,
-    n_subsets=3,
+    n_subsets=settings.n_subsets,
     n_max=settings.len_dataset,
     trans_train=trans_train,
     trans_val=trans_val
