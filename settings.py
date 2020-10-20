@@ -55,8 +55,8 @@ if is_running_on_desktop:
         save_design=False,
         save_interval=1,
         path='C:/Users/Dennis/Documents/tmp',
-        save_lossplot=True,
-        save_preview=True,
+        save_lossplot=False,
+        save_preview=False,
     )
 
 # -----------------------------------------------------------------------------
@@ -107,6 +107,6 @@ else:
         load_design=False,
         save_interval=15,
         path='/home/tue/s111167/trained_models_gpu',
-        save_lossplot=True,
-        save_preview=True,
+        save_lossplot=False,
+        save_preview=False,
     )

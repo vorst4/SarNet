@@ -38,7 +38,7 @@ class Progress:
                      save_design: bool = False,
                      save_lossplot: bool = False,
                      save_preview: bool = False,
-                     save_interval: float = 10,
+                     save_interval: float = 10,  # todo: has become obsolete
                      path: Union[str, Path] = None,
                      filename_design: str = 'design.pt',
                      n_backups: int = 3,
