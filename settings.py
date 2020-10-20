@@ -21,7 +21,7 @@ if is_running_on_desktop:
     train_pct = 90  # in percent
 
     # batch size (int)
-    batch_size = 20
+    batch_size = 100
 
     # number of train/valid subsets
     #   The evaluation set (can be) split into N unique subsets that are
@@ -37,7 +37,8 @@ if is_running_on_desktop:
 
     # length of dataset (float): maximum length (in samples) of the dataset
     #   to be used, set to None to use the whole dataset
-    len_dataset = 10000
+    # len_dataset = 10000
+    len_dataset = None
 
     # batch normalisation settings
     batch_norm = {'momentum': 0.99, 'eps': 1e-3}

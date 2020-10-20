@@ -344,18 +344,46 @@ class Design:
                     continue
                 self._epoch_current = epoch + idx / len(self._dl_train)
 
+                # memory before training
+                self._log.logprint('  memory usage (cpu): ' +
+                                   self._log.memory_usage())
+                if torch.cuda.is_available():
+                    self._log.logprint('  memory usage (gpu): \n' +
+                                       torch.cuda.memory_summary())
+
                 # train
                 timer.start()
                 self.train_subset(dl_t)
                 timer.stop('finished training')
+
+                # memory after train subset
+                self._log.logprint('  memory usage (cpu): ' +
+                                   self._log.memory_usage())
+                if torch.cuda.is_available():
+                    self._log.logprint('  memory usage (gpu): \n' +
+                                       torch.cuda.memory_summary())
 
                 # evaluate
                 timer.start()
                 img_true, img_pred = self.evaluate_subset(dl_v)
                 timer.stop('finished validating')
 
+                # memory after validation subset
+                self._log.logprint('  memory usage (cpu): ' +
+                                   self._log.memory_usage())
+                if torch.cuda.is_available():
+                    self._log.logprint('  memory usage (gpu): \n' +
+                                       torch.cuda.memory_summary())
+
                 # save progress
                 progress(img_true, img_pred)
+
+            # memory after 1 epoch
+            self._log.logprint('  memory usage (cpu): ' +
+                               self._log.memory_usage())
+            if torch.cuda.is_available():
+                self._log.logprint('  memory usage (gpu): \n' +
+                                   torch.cuda.memory_summary())
 
             # # evaluate
             # img_true, img_pred, mse_valid, mse_p, tae_p = self._evaluate()
