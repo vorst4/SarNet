@@ -1,9 +1,34 @@
 from typing import Tuple
 
 import numpy as np
+import settings
 
 
-class PerformanceParameter2D:
+class Performance:
+
+    def __init__(self, n_validation_samples):
+        self.n_validation_samples = n_validation_samples
+        self.mse_train = _MseTrain()
+        self.mse_valid = _MseValid()
+        self.loss_valid = _LossValid(n_validation_samples)
+
+    def to_dict(self):
+        return {
+            'mse_train': self.mse_train.to_dict(),
+            'mse_valid': self.mse_valid.to_dict(),
+            'loss_valid': self.loss_valid.to_dict(),
+            'n_validation_samples': self.n_validation_samples,
+        }
+
+    @classmethod
+    def load(cls, dictionary):
+        obj = cls(dictionary['n_validation_samples'])
+        obj.mse_train = _MseTrain.load(dictionary)
+        obj.mse_valid = _MseValid.load(dictionary)
+        return obj
+
+
+class _List:
 
     def __init__(self, x_label: str, y_label: str, size: int):
         self.x_label = x_label
@@ -13,9 +38,10 @@ class PerformanceParameter2D:
         self.y = [-1.0] * size
         self.idx = 0
 
-    @classmethod
+    @staticmethod
     def load(cls, dictionary: dict):
-        obj = cls(dictionary['x_label'], dictionary['y_label'],
+        obj = cls(dictionary['x_label'],
+                  dictionary['y_label'],
                   dictionary['size'])
         obj.x = dictionary['x']
         obj.y = dictionary['y']
@@ -23,12 +49,14 @@ class PerformanceParameter2D:
         return obj
 
     def to_dict(self):
-        return {'x_label': self.x_label,
-                'y_label': self.y_label,
-                'x': self.x,
-                'y': self.y,
-                'size': self.size,
-                'idx': self.idx}
+        return {
+            'x_label': self.x_label,
+            'y_label': self.y_label,
+            'x': self.x,
+            'y': self.y,
+            'size': self.size,
+            'idx': self.idx,
+        }
 
     def append(self, x, y):
         self.x[self.idx] = float(x)
@@ -40,10 +68,11 @@ class PerformanceParameter2D:
         Allocate 'n' empty elements in the x and y array.
         """
 
-        # current number of empty elements
-        n0 = len(self)
+        # current number of elements
+        n0 = len(self.x)
 
-        # return if empty elements to be allocated is less than current number of empty elements
+        # return if empty elements to be allocated is less than current
+        # number of empty elements
         if n <= n0:
             return
 
@@ -61,23 +90,28 @@ class PerformanceParameter2D:
         return str(self.to_dict())
 
 
-class PerformanceParameter3D:
+class _DoubleList:
 
-    def __init__(self, x_label: str, y_label: str, z_label: str,
-                 sizes: Tuple[int, int]):
+    def __init__(self,
+                 x_label: str,
+                 y_label: str,
+                 z_label: str,
+                 shape: Tuple[int, int]):
         self.x_label = x_label
         self.y_label = y_label
         self.z_label = z_label
-        self.sizes = sizes
-        self.x = [0.0] * sizes[0] * sizes[1]
-        self.y = [0.0] * sizes[0] * sizes[1]
-        self.z = [0.0] * sizes[0] * sizes[1]
+        self.shape = shape
+        self.x = [0.0] * shape[1] * shape[0]
+        self.y = [0.0] * shape[1] * shape[0]
+        self.z = [0.0] * shape[1] * shape[0]
         self.idx = 0
 
-    @classmethod
+    @staticmethod
     def load(cls, dictionary: dict):
-        obj = cls(dictionary['x_label'], dictionary['y_label'],
-                  dictionary['z_label'], dictionary['size'])
+        obj = cls(dictionary['x_label'],
+                  dictionary['y_label'],
+                  dictionary['z_label'],
+                  dictionary['size'])
         obj.x = dictionary['x']
         obj.y = dictionary['y']
         obj.z = dictionary['z']
@@ -85,14 +119,16 @@ class PerformanceParameter3D:
         return obj
 
     def to_dict(self):
-        return {'x_label': self.x_label,
-                'y_label': self.y_label,
-                'z_label': self.z_label,
-                'x': self.x,
-                'y': self.y,
-                'z': self.z,
-                'size': self.sizes,
-                'idx': self.idx}
+        return {
+            'x_label': self.x_label,
+            'y_label': self.y_label,
+            'z_label': self.z_label,
+            'x': self.x,
+            'y': self.y,
+            'z': self.z,
+            'size': self.shape,
+            'idx': self.idx,
+        }
 
     def append(self, x, y, z):
         if not isinstance(y, list):
@@ -112,10 +148,11 @@ class PerformanceParameter3D:
         Allocate 'n' empty elements in the x, y, z arrays.
         """
 
-        # current number of empty elements
-        n0 = len(self)
+        # current number of elements
+        n0 = len(self.x)
 
-        # return if empty elements to be allocated is less than current number of empty elements
+        # return if elements to be allocated is less than current
+        # number of empty elements
         if n <= n0:
             return
 
@@ -132,3 +169,59 @@ class PerformanceParameter3D:
 
     def __str__(self):
         return str(self.to_dict())
+
+
+class _MseTrain(_List):
+
+    def __init__(self):
+        super().__init__('epochs',
+                         'MSE_train',
+                         settings.epochs * settings.n_subsets)
+
+    def append(self, epoch, mse_train):
+        super().append(epoch, mse_train)
+
+    @classmethod
+    def load(cls, dictionary):
+        return super().load(cls, dictionary)
+
+
+class _MseValid(_List):
+    def __init__(self):
+        super().__init__('epochs',
+                         'MSE_valid',
+                         settings.epochs * settings.n_subsets)
+
+    def append(self, epoch, mse_valid):
+        super().append(epoch, mse_valid)
+
+    @classmethod
+    def load(cls, dictionary):
+        return super().load(cls, dictionary)
+
+
+class _LossValid(_DoubleList):
+    def __init__(self, n_validation_samples):
+        super().__init__(x_label='epoch',
+                         y_label='loss_valid',
+                         z_label='sample_idx',
+                         shape=(settings.epochs * settings.n_subsets,
+                                n_validation_samples),
+                         )
+        self.n_validation_samples = n_validation_samples
+
+    def append(self, epoch, loss, sample_idx):
+        super().append(epoch, loss, sample_idx)
+
+    @classmethod
+    def load(cls, dictionary):
+        return super().load(cls, dictionary)
+
+    def get_shape(self) -> dict:
+        return {
+            'len_epochs': self.shape[0],
+            'n_validation_samples': self.shape[1],
+        }
+
+    def allocate(self, len_epochs):
+        super().allocate(len_epochs * self.n_validation_samples)

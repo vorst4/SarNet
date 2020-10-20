@@ -2,7 +2,7 @@ import abc
 import json
 import os
 from pathlib import Path
-from time import time
+from util.timer import Timer
 from typing import Union, List, Tuple
 
 import numpy as np
@@ -13,9 +13,11 @@ import torch.utils.data
 from torch.utils.data import DataLoader, Subset
 
 import models
-from .dataset import Dataset
+import settings
+from .data import Dataset
 from .log import Log
-from .performance import PerformanceParameter2D, PerformanceParameter3D
+# from .performance import MsePerSubEpoch, PerformanceParameter3D
+from util.performance import Performance
 from .progress import Progress
 
 
@@ -57,19 +59,16 @@ class Design:
         self._epoch_start = None
         self._epoch_current = None
         self._epoch_stop = None
-        self._train_mse_per_epoch = None
-        self._valid_mse_per_epoch = None
-        self._valid_mse_per_phase_per_epoch = None
-        self._valid_tae_per_phase_per_epoch = None
         self._timer = None
+        self.performance: Performance = None
         self.saved_after_epoch = None
         self.n_batches = None
         self.idx_batch = None
         torch.manual_seed(self._torch_seed)
 
     def create(self,
-               dataloader_training: torch.utils.data.DataLoader,
-               dataloader_validation: torch.utils.data.DataLoader,
+               dataloader_training: List[torch.utils.data.DataLoader],
+               dataloader_validation: List[torch.utils.data.DataLoader],
                model: nn.Module,
                loss_function: nn.Module,
                optimizer: torch.optim,
@@ -87,27 +86,22 @@ class Design:
         self._epoch_current = 0
         self._epoch_stop = epochs
 
-        # initialize performance parameters
-        self._train_mse_per_epoch = PerformanceParameter2D('mse_train',
-                                                           'epoch', epochs)
-        self._valid_mse_per_epoch = PerformanceParameter2D('mse_valid',
-                                                           'epoch', epochs)
-        self._valid_mse_per_phase_per_epoch = \
-            PerformanceParameter3D('mse_valid', 'phase', 'epoch',
-                                   (self.n_phase, epochs))
-        self._valid_tae_per_phase_per_epoch = \
-            PerformanceParameter3D('tae_valid', 'phase', 'epoch',
-                                   (self.n_phase, epochs))
+        # performance parameters
+        #   get total number of validation samples
+        n_validation_samples = 0
+        for dl in self._dl_val:
+            n_validation_samples += len(dl.dataset)
+        #   create performance object
+        self.performance = Performance(n_validation_samples)
 
         # log
+        # todo: expand upon information that is being logged
         log.logprint('Created Design')
         log.logprint('  model: ' + str(type(self._model)))
         log.logprint('  device: ' + str(self.device))
         log.logprint(
-            '  dataset size training: %i' % len(self._dl_train.dataset))
-        log.logprint(
-            '  dataset size validation: %i' % len(self._dl_val.dataset))
-        log.logprint('  batch size: %i' % self._dl_train.batch_size)
+            '  dataset size: %i' % len(self._dl_train[0].dataset))
+        log.logprint('  batch size: %i' % self._dl_train[0].batch_size)
         n_parameters = sum(
             parameter.numel() for parameter in self._model.parameters())
         log.logprint('  number of model parameters: %s' %
@@ -118,33 +112,6 @@ class Design:
                          torch.cuda.memory_summary())
 
         return self
-
-    def get_train_mse_per_epoch(self) -> list:
-        """
-        Get epochs -corresponding to the calculated loss-, obtained during
-        training
-        """
-        return self._train_mse_per_epoch()
-
-    def get_valid_mse_per_epoch(self) -> list:
-        """
-        Get calculated loss per epoch, obtained during training
-        """
-        return self._valid_mse_per_epoch()
-
-    def get_valid_mse_per_phase_per_epoch(self) -> list:
-        """
-        Get epochs -corresponding to the calculated loss-, obtained during
-        validation
-        """
-        return self._valid_mse_per_phase_per_epoch()
-
-    def get_valid_tae_per_phase_per_epoch(self) -> list:
-        """
-        Get epochs -corresponding to the calculated loss-, obtained during
-        validation
-        """
-        return self._valid_tae_per_phase_per_epoch()
 
     def get_epoch_stop(self) -> int:
         """
@@ -202,23 +169,23 @@ class Design:
             models_.append(cls.get_model_from_name(name))
         return models_
 
-    @classmethod
-    def get_default_dataloaders(
-            cls,
-            path_dataset: Union[str, Path],
-            batch_size: int
-    ) -> Tuple[DataLoader, DataLoader]:
-        split_pct = 0.9
-        dataset = Dataset(path_dataset)
-        n_training = int(split_pct * len(dataset))
-        dataset_training = Subset(dataset, indices=range(0, n_training))
-        dataset_validation = Subset(dataset,
-                                    indices=range(n_training, len(dataset)))
-        dataloader_training = DataLoader(dataset_training, batch_size,
-                                         shuffle=True)
-        dataloader_validation = DataLoader(dataset_validation, batch_size,
-                                           shuffle=False)
-        return dataloader_training, dataloader_validation
+    # @classmethod
+    # def get_default_dataloaders(
+    #         cls,
+    #         path_dataset: Union[str, Path],
+    #         batch_size: int
+    # ) -> Tuple[DataLoader, DataLoader]:
+    #     split_pct = 0.9
+    #     dataset = Dataset(path_dataset)
+    #     n_training = int(split_pct * len(dataset))
+    #     dataset_training = Subset(dataset, indices=range(0, n_training))
+    #     dataset_validation = Subset(dataset,
+    #                                 indices=range(n_training, len(dataset)))
+    #     dataloader_training = DataLoader(dataset_training, batch_size,
+    #                                      shuffle=True)
+    #     dataloader_validation = DataLoader(dataset_validation, batch_size,
+    #                                        shuffle=False)
+    #     return dataloader_training, dataloader_validation
 
     def set_epoch_stop(self, epoch_stop: int):
         """
@@ -233,10 +200,9 @@ class Design:
         self._epoch_stop = epoch_stop
 
         # allocate space for the performance parameters
-        self._train_mse_per_epoch.allocate(epoch_stop)
-        self._valid_mse_per_epoch.allocate(epoch_stop)
-        self._valid_mse_per_phase_per_epoch.allocate(self.n_phase * epoch_stop)
-        self._valid_tae_per_phase_per_epoch.allocate(self.n_phase * epoch_stop)
+        self.performance.mse_train.allocate(epoch_stop * settings.n_subsets)
+        self.performance.mse_valid.allocate(epoch_stop * settings.n_subsets)
+        self.performance.loss_valid.allocate(epoch_stop * settings.n_subsets)
 
     def save(self, path, name=None, backups: List[Path] = None):
         """
@@ -332,12 +298,19 @@ class Design:
         settings.
         """
 
+        timer = Timer(self._log)
+        self._timer = timer
+
         # initialize progress display/saver
-        res_img_out = self._dl_train.dataset.shapes[Dataset.KEY.OUTPUT][1]
+        # res_img_out = self._dl_train[0].dataset.shapes[Dataset.KEY.OUTPUT][1]
+        res_img_out = 64  # todo: make this dynamic
+        timer.start()
         progress = Progress(progress_settings, self, self._log,
                             res_img_out)
+        timer.stop('created progress obj')
 
         # load previous model state if needed
+        timer.start()
         if progress.load_design:
             if progress.path_design.exists():
                 self.load(progress.path_design,
@@ -345,44 +318,68 @@ class Design:
                           self._dl_train,
                           self._dl_val,
                           self._log)
+            timer.stop('loaded design')
 
         # reset starting epoch
         self._epoch_start = self._epoch_current
 
         # move model to gpu/cpu
+        timer.start()
         self._model = self._model.to(device=self.device)
+        timer.stop('moved model to gpu')
 
         # start timer
-        self._timer = time()
+        self._timer.start()
 
         # loop over epochs
-        for self._epoch_current in range(self._epoch_start, self._epoch_stop):
-            # train
-            mse_train = self.train_1epoch(progress)
+        for epoch in range(int(self._epoch_start), self._epoch_stop):
 
-            # evaluate
-            img_true, img_pred, mse_valid, mse_p, tae_p = self._evaluate()
+            # loop over training and validation subsets
+            for idx, (dl_t, dl_v) in enumerate(zip(self._dl_train,
+                                                   self._dl_val)):
+                # if the model was loaded, skip until current epoch has been
+                # reached
+                ec = epoch + idx / len(self._dl_train)
+                if ec < self._epoch_current:
+                    continue
+                self._epoch_current = epoch + idx / len(self._dl_train)
+
+                # train
+                timer.start()
+                self.train_subset(dl_t)
+                timer.stop('finished training')
+
+                # evaluate
+                timer.start()
+                img_true, img_pred = self.evaluate_subset(dl_v)
+                timer.stop('finished validating')
+
+                # save progress
+                progress(img_true, img_pred)
+
+            # # evaluate
+            # img_true, img_pred, mse_valid, mse_p, tae_p = self._evaluate()
 
             # log progress
-            self._train_mse_per_epoch.append(self._epoch_current, mse_train)
-            self._valid_mse_per_epoch.append(self._epoch_current, mse_valid)
-            self._valid_mse_per_phase_per_epoch.append(
-                self._epoch_current,
-                mse_p['phase'],
-                mse_p['mse']
-            )
-            self._valid_tae_per_phase_per_epoch.append(
-                self._epoch_current,
-                tae_p['phase'],
-                tae_p['tae']
-            )
+            # self._train_mse_per_epoch.append(self._epoch_current, mse_train)
+            # self._valid_mse_per_epoch.append(self._epoch_current, mse_valid)
+            # self._valid_mse_per_phase_per_epoch.append(
+            #     self._epoch_current,
+            #     mse_p['phase'],
+            #     mse_p['mse']
+            # )
+            # self._valid_tae_per_phase_per_epoch.append(
+            #     self._epoch_current,
+            #     tae_p['phase'],
+            #     tae_p['tae']
+            # )
 
             # show/save progress
             #   img_true and img_pred are the true and predicted images of
             #   the last batch, these are used for the
             #   preview
-            self.saved_after_epoch = True
-            progress(img_true, img_pred)
+            # self.saved_after_epoch = True
+            # progress(img_true, img_pred)
 
             # # update learning rate
             # if lr_sched is not None:
@@ -395,84 +392,135 @@ class Design:
         # move model back to cpu
         self._model = self._model.cpu()
 
-    def train_1epoch(self, progress: Progress):
+    def train_subset(self, dataloader: DataLoader):
         """
-        Train model for 1 epoch
+        Train on the given training subset
         """
 
-        self.n_batches = len(self._dl_train)
+        self.n_batches = len(dataloader)
         mse = 0.0
 
+        timer = Timer(self._log)
+
+        timer_ = Timer(self._log)
+        timer_.start()
+
         # loop over batches
-        for self.idx_batch, data in enumerate(self._dl_train):
+        for self.idx_batch, data in enumerate(dataloader):
+            timer.start()
+
+            timer_.stop('\tloaded batch')
+
             # make sure model is in train mode
+            timer_.start()
             self._model.train()
+            timer_.stop('\tset model to train mode')
 
             # abbreviate variables and move them to <device>
+            timer_.start()
             kwargs = {'device': self.device, 'dtype': self.dtype}
             yt = data[Dataset.KEY.OUTPUT].to(**kwargs)
             x_img = data[Dataset.KEY.INPUT_IMG].to(**kwargs)
             x_meta = data[Dataset.KEY.INPUT_META].to(**kwargs)
+            timer_.stop('\tabbreviated variables and moved them to device')
 
             # calculate predicted outcome and loss
+            timer_.start()
             yp = self._model(x_img, x_meta)
+            timer_.stop('\tcalculated prediction')
+
+            timer_.start()
             loss = self._loss_function(yp, yt)
+            timer_.stop('\tcalculated loss')
 
             # calculate gradient (a.k.a. backward propagation)
+            timer_.start()
             loss.backward()
+            timer_.stop('\tcalculated gradient')
 
             # update model parameters using the gradient
+            timer_.start()
             self._optimizer.step()
+            timer_.stop('\ttook optimizer step')
 
+            # calculate mse
+            timer_.start()
             mse += loss.cpu().detach().item() / self.n_batches
+            timer_.stop('\tcalculated mse')
 
-            # save model if interval has passed (and reset timer)
-            if (time() - self._timer) / 60 > \
-                    progress.settings.save_interval:
-                self._timer = time()
-                self.saved_after_epoch = False
-                # update progress (& save)
-                progress(yt, yp, mse_batch=loss)
+            timer.stop('trained for 1 batch')
 
-        return mse
+        # update performance parameter
+        timer.start()
+        self.performance.mse_train.append(epoch=self._epoch_current,
+                                          mse_train=mse)
+        timer.stop('updated performance parameter')
 
-    def _evaluate(self):
+    def evaluate_subset(self, dataloader: DataLoader):
         """
         evaluate model on validation dataset
         """
 
+        timer = Timer(self._log).start()
+        timer_ = Timer(self._log)
+
         # set model to evaluation mode
         self._model.eval()
+        timer.stop('model set to evaluation mode')
 
-        n_batches = len(self._dl_val)
-        mse1 = 0.0
-        tae = {'phase': [], 'tae': []}
-        mse = {'phase': [], 'mse': []}
+        n_batches = len(dataloader)
+        mse = 0.0
+        # tae = {'phase': [], 'tae': []}
+        # mse = {'phase': [], 'mse': []}
 
+        timer.start()
+        timer_.start()
         # gradient does not have to be calculated during evaluation
         with torch.no_grad():
             # loop over the evaluation dataset
-            for idx_batch, data in enumerate(self._dl_val):
+            for idx_batch, data in enumerate(dataloader):
+                timer_.stop('loaded validation batch')
+
+                timer_.start()
                 # abbreviate variables and move to <device>
-                yt = data[Dataset.KEY.OUTPUT].to(device=self.device,
-                                                 dtype=self.dtype)
-                x1 = data[Dataset.KEY.INPUT_IMG].to(device=self.device,
-                                                    dtype=self.dtype)
-                x2 = data[Dataset.KEY.INPUT_META].to(device=self.device,
-                                                     dtype=self.dtype)
+                kwargs = {'device': self.device, 'dtype': self.dtype}
+                yt = data[Dataset.KEY.OUTPUT].to(**kwargs)
+                x_img = data[Dataset.KEY.INPUT_IMG].to(**kwargs)
+                x_meta = data[Dataset.KEY.INPUT_META].to(**kwargs)
+                timer_.stop('abbreviated variables and moved to device')
 
                 # calculate predicted outcome and loss
-                yp = self._model(x1, x2)
+                timer_.start()
+                yp = self._model(x_img, x_meta)
+                timer_.stop('calculated prediction')
+
+                timer_.start()
                 loss = self._loss_function(yp, yt)
+                timer_.stop('calculated loss')
 
-                mse1 += loss.cpu().detach().item() / n_batches
-                phase = (x2[:, 1].cpu().detach() * 180 / np.pi).tolist()
-                tae['phase'].extend(phase)
-                tae['tae'].extend(self._calc_tae(torch.abs(yt - yp)))
-                mse['phase'].extend(phase)
-                mse['mse'].extend(self._calc_mse(torch.abs(yt - yp)))
+                # update performance parameter
+                timer_.start()
+                self.performance.loss_valid.append(
+                    epoch=self._epoch_current,
+                    loss=loss,
+                    sample_idx=data[Dataset.KEY.INDEX]
+                )
+                timer_.stop('added performance parameter (loss_valid)')
 
-        return yt, yp, mse1, mse, tae
+                # calculate mse
+                timer_.start()
+                mse += loss.cpu().detach().item() / n_batches
+                timer_.stop('calculated mse')
+
+                timer.stop('calculated 1 validation batch')
+
+        # update performance parameter
+        timer.start()
+        self.performance.mse_valid.append(epoch=self._epoch_current,
+                                          mse_train=mse)
+        timer.stop('updated performance parameter (mse_valid)')
+
+        return yt, yp
 
     @staticmethod
     def _calc_tae(img_err):
@@ -497,15 +545,13 @@ class Design:
             return False
 
     def _to_dict(self):
-        dictionary = {'serial': {}, 'par2d': {}, 'par3d': {}, 'state_dict': {},
+        dictionary = {'serial': {},
+                      'performance': self.performance.to_dict(),
+                      'state_dict': {},
                       'non_serializable': {}}
         for key, val in vars(self).items():
             if self._is_var_serializable(val):
                 dictionary['serial'][key] = val
-            elif isinstance(val, PerformanceParameter2D):
-                dictionary['par2d'][key] = val.to_dict()
-            elif isinstance(val, PerformanceParameter3D):
-                dictionary['par3d'][key] = val.to_dict()
             elif hasattr(val, 'state_dict') and hasattr(val,
                                                         'load_state_dict'):
                 dictionary['state_dict'][key] = val
@@ -516,11 +562,6 @@ class Design:
     def _from_dict(self, dictionary):
         for key, val in dictionary['serial'].items():
             setattr(self, key, val)
-        if 'par2d' in dictionary:
-            for key, val in dictionary['par2d'].items():
-                setattr(self, key, PerformanceParameter2D.load(val))
-        if 'par3d' in dictionary:
-            for key, val in dictionary['par3d'].items():
-                setattr(self, key, PerformanceParameter3D.load(val))
+        self.performance = Performance.load(dictionary['performance'])
         for key, val in dictionary['state_dict'].items():
             setattr(self, key, val)
