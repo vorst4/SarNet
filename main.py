@@ -18,7 +18,7 @@ from util.timer import Timer
 # script, this is not necessary when running it on the desktop
 if settings.is_running_on_desktop:
     partition_id = 0
-    job_id = 0
+    job_id = 1
     n_cpus = 4
     n_gpus = 1
 else:
