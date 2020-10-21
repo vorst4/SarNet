@@ -73,9 +73,6 @@ class Design:
         self._epoch_stop = None
         self._timer = None
         self.performance: Performance = None
-        self.saved_after_epoch = None
-        self.n_batches = None
-        self.idx_batch = None
         self._mse_per_sample = MsePerSample(None)
         torch.manual_seed(self._torch_seed)
 

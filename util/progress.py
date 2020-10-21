@@ -42,7 +42,7 @@ class Progress:
                      filename_design: str = 'design.pt',
                      n_backups: int = 3,
                      filename_best_design: str = 'best_design.pt',
-                     filename_lossplot: str = 'lossplot.png',
+                     filename_lossplot: str = 'lossplot.pdf',
                      subdir_preview: str = 'preview',
                      filename_prefix_preview: str = 'preview e',
                      filename_postfix_preview: str = '.png',
@@ -215,15 +215,13 @@ class Progress:
 
             # if the last validation loss is the lowest, also save it as
             # 'best' design (if epoch is finished)
-            if self.design.saved_after_epoch:
-                _, lv = self.design.performance.mse_valid()
-                if lv[-1] == min(lv):
-                    self.design.save(self.path_best_design,
-                                     backups=self.path_best_design_backup)
+            _, lv = self.design.performance.mse_valid()
+            if lv[-1] == min(lv):
+                self.design.save(self.path_best_design,
+                                 backups=self.path_best_design_backup)
 
         # lossplot
-        if self.settings.lossplot or self.settings.save_lossplot and \
-                self.design.saved_after_epoch:
+        if self.settings.lossplot or self.settings.save_lossplot:
             self._lossplot()
 
         # preview
@@ -298,13 +296,9 @@ class Progress:
 
         # adjust axes
         fig = plt.figure(self.IDX_LOSSPLOT)
-        y_last = (lt[-1], lv[-1])
-        if self.lossplot_min > min(y_last):
-            self.lossplot_min = min(y_last)
-        if self.lossplot_max < max(y_last):
-            self.lossplot_max = max(y_last)
-        plt.xlim([0, et[-1] + 1])
-        plt.ylim([0.9 * self.lossplot_min, 1.1 * self.lossplot_max])
+        plt.xlim([0, et[-1] + 0.1])
+        plt.ylim([0.9 * min([min(lt), min(lv)]),
+                  1.1 * max([max(lt), max(lv)])])
 
         # update lossplot display
         if self.settings.lossplot:
@@ -313,7 +307,13 @@ class Progress:
 
         # save lossplot
         if self.settings.save_lossplot:
-            fig.savefig(self.path_lossplot)
+            try:
+                fig.savefig(self.path_lossplot)
+            except PermissionError:
+                self.log.logprint(
+                    'WARNING: permission error occurred during saving the '
+                    'lossplot'
+                )
 
     def _preview(self):
         """

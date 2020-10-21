@@ -37,7 +37,7 @@ if is_running_on_desktop:
 
     # length of dataset (float): maximum length (in samples) of the dataset
     #   to be used, set to None to use the whole dataset
-    len_dataset = 100
+    len_dataset = 1000
 
     # batch normalisation settings
     batch_norm = {'momentum': 0.99, 'eps': 1e-3}
@@ -102,9 +102,9 @@ else:
 
     # progress logging settings
     progress_settings = Progress.Settings(
-        save_design=False,
+        save_design=True,
         load_design=False,
         path='/home/tue/s111167/trained_models_gpu',
-        save_lossplot=False,
-        save_preview=False,
+        save_lossplot=True,
+        save_preview=True,
     )

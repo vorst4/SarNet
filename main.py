@@ -76,8 +76,8 @@ ds = Dataset(
     train_pct=settings.train_pct,
     n_subsets=settings.n_subsets,
     n_max=settings.len_dataset,
-    trans_train=trans_train,
-    trans_val=trans_val
+    # trans_train=trans_train,  # todo: re-enable transformations (+validate)
+    # trans_val=trans_val  # todo: re-enable transformations (+validate)
 )
 ds_train, ds_val = ds.training, ds.validation
 timer.stop('created dataset')

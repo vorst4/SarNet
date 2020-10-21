@@ -15,7 +15,7 @@ class ConvAE1(nn.Module, ABC):
         decoder: 5 times (transpose conv2d, batch norm, relu)
     """
 
-    lr_ideal = 1e-5
+    lr_ideal = 1e-3
 
     def __init__(self):
         super().__init__()
@@ -36,11 +36,11 @@ class ConvAE1(nn.Module, ABC):
 
         self.decoder = nn.Sequential(
             Reshape(channels=512, resolution=2),
-            ConvBnHs(ci=512, co=256, k=3, s=2, t=True),  # 2 -> 4
-            ConvBnHs(co=256, k=3, s=2, t=True),  # -> 8
-            ConvBnHs(co=128, k=5, s=2, t=True),  # -> 16
-            ConvBnHs(co=64, k=5, s=2, t=True),  # -> 32
-            ConvBnHs(co=32, k=3, s=2, t=True),  # -> 64
+            ConvBnHs(ci=512, co=256, k=2, s=2, po=0, t=True),  # 2 -> 4
+            ConvBnHs(co=256, k=2, s=2, po=0, t=True),  # -> 8
+            ConvBnHs(co=128, k=4, s=2, po=0, t=True),  # -> 16
+            ConvBnHs(co=64, k=4, s=2, po=0, t=True),  # -> 32
+            ConvBnHs(co=32, k=2, s=2, po=0, t=True),  # -> 64
             nn.Conv2d(32, 1, 3, padding=1),
         )
 
