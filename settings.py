@@ -75,7 +75,7 @@ else:
     train_pct = 90  # in percent
 
     # batch size (int)
-    batch_size = 128
+    batch_size = 128 * 2
 
     # number of train/valid subsets
     #   The evaluation set (can be) split into N unique subsets that are
