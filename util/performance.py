@@ -105,6 +105,11 @@ class _DoubleList:
         self.y_label = y_label
         self.z_label = z_label
         self.shape = shape
+        print(shape)
+        # todo: allocating x,y,z (below) will result in an out of memory
+        #  error on the server with var _MseSampleValid. this needs to be
+        #  fixed. Maybe: save the data each epoch instead of keeping it in
+        #  memory
         self.x = [0.0] * shape[1] * shape[0]
         self.y = [0.0] * shape[1] * shape[0]
         self.z = [0.0] * shape[1] * shape[0]
@@ -208,6 +213,7 @@ class _MseSampleValid(_DoubleList):
     """
     MSE of each individual sample from the validation set, per epoch.
     """
+
     def __init__(self, n_validation_samples):
         super().__init__(x_label='epoch',
                          y_label='mse',

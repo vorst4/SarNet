@@ -84,14 +84,14 @@ else:
     #   Thus, evaluating the dataset at multiple times during an epoch can
     #   provide more information on how the network is improving during
     #   training.
-    n_subsets = 100
+    n_subsets = 10
 
     # path of dataset (str): the path at which the dataset csv file is located.
     path_dataset = 'dataset_sar/dataset.csv'
 
     # length of dataset (float): maximum length (in samples) of the dataset
     #   to be used, set to None to use the whole dataset
-    len_dataset = 10000
+    len_dataset = 100000
 
     # batch normalisation settings
     batch_norm = {'momentum': 0.99, 'eps': 1e-3}
