@@ -218,7 +218,7 @@ class _MseSampleValid(_DoubleList):
         super().__init__(x_label='epoch',
                          y_label='mse',
                          z_label='sample_idx',
-                         shape=(settings.epochs * settings.n_subsets,
+                         shape=(settings.epochs,
                                 n_validation_samples),
                          )
         self.n_validation_samples = n_validation_samples

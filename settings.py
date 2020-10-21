@@ -72,7 +72,7 @@ else:
 
     # train percentage (float): percentage of the dataset that is to be used
     #   for training, the rest is used for evaluation.
-    train_pct = 90  # in percent
+    train_pct = 95  # in percent
 
     # batch size (int)
     batch_size = 128 * 2
@@ -84,14 +84,14 @@ else:
     #   Thus, evaluating the dataset at multiple times during an epoch can
     #   provide more information on how the network is improving during
     #   training.
-    n_subsets = 10
+    n_subsets = 1000
 
     # path of dataset (str): the path at which the dataset csv file is located.
     path_dataset = 'dataset_sar/dataset.csv'
 
     # length of dataset (float): maximum length (in samples) of the dataset
     #   to be used, set to None to use the whole dataset
-    len_dataset = 100000
+    len_dataset = None  # 100000
 
     # batch normalisation settings
     batch_norm = {'momentum': 0.99, 'eps': 1e-3}
@@ -104,7 +104,7 @@ else:
     progress_settings = Progress.Settings(
         save_design=True,
         load_design=False,
-        path='/home/tue/s111167/trained_models_gpu',
+        path='/home/tue/s111167/trained_models',
         save_lossplot=True,
         save_preview=True,
     )
