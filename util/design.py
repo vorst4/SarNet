@@ -97,7 +97,7 @@ class Design:
         # log
         # todo: expand upon information that is being logged
         log.logprint(self.info())
-        log.logprint('...don')
+        log.logprint('...done')
         exit()
 
         return self
@@ -117,23 +117,20 @@ class Design:
         s += '  model: %s\n' % str(type(self._model))
         s += '  device: %s\n' % str(self.device)
         s += '  dataset:\n'
-        s += '  | number of subsets: %i\n' % settings.n_subsets
-        s += '  | size total: %i \n' % len(self._dl_train[0].dataset.dataset)
-        s += '  | size train: %i (%.0f%%) [%s]\n' % \
+        s += '    number of subsets: %i\n' % settings.n_subsets
+        s += '    size total: %i \n' % len(self._dl_train[0].dataset.dataset)
+        s += '    size train: %i (%.0f%%) [%s]\n' % \
              (sum(nt), settings.train_pct, ','.join(map(str, nt)))
-        s += '  | size valid: %i (%.0f%%) [%s]\n' % \
+        s += '    size valid: %i (%.0f%%) [%s]\n' % \
              (sum(nv), 100 - settings.train_pct, ','.join(map(str, nv)))
         s += '  number of model parameters: %s\n' % '{:,}'.format(n_par)
-        s += '  memory usage (cpu): %s\n' % self._log.memory_usage()
-
-        if torch.cuda.is_available():
-            mem = torch.cuda.get_device_properties(self.device).total_memory
-            s += '  memory available (gpu): %i\n' % mem
-            # s += '  memory usage (gpu): \n' + torch.cuda.memory_summary()
-        else:
-            s += '  not using CUDA\n'
+        s += '  memory usage\n' + self._log.memory_usage(' ' * 4)
 
         return s
+
+    def gpu_memory(self):
+        s = ''
+        s += ''
 
     def get_epoch_stop(self) -> int:
         """
@@ -368,7 +365,7 @@ class Design:
 
                 # memory before training
                 self._log.logprint('  memory usage (cpu): ' +
-                                   self._log.memory_usage())
+                                   self._log.cpu_memory_usage())
                 if torch.cuda.is_available():
                     self._log.logprint('  memory usage (gpu): \n' +
                                        torch.cuda.memory_summary())
@@ -380,7 +377,7 @@ class Design:
 
                 # memory after train subset
                 self._log.logprint('  memory usage (cpu): ' +
-                                   self._log.memory_usage())
+                                   self._log.cpu_memory_usage())
                 if torch.cuda.is_available():
                     self._log.logprint('  memory usage (gpu): \n' +
                                        torch.cuda.memory_summary())
@@ -392,7 +389,7 @@ class Design:
 
                 # memory after validation subset
                 self._log.logprint('  memory usage (cpu): ' +
-                                   self._log.memory_usage())
+                                   self._log.cpu_memory_usage())
                 if torch.cuda.is_available():
                     self._log.logprint('  memory usage (gpu): \n' +
                                        torch.cuda.memory_summary())
@@ -402,7 +399,7 @@ class Design:
 
             # memory after 1 epoch
             self._log.logprint('  memory usage (cpu): ' +
-                               self._log.memory_usage())
+                               self._log.cpu_memory_usage())
             if torch.cuda.is_available():
                 self._log.logprint('  memory usage (gpu): \n' +
                                    torch.cuda.memory_summary())

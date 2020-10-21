@@ -47,7 +47,7 @@ log = Log(directory=settings.directory_log,
           save_log=settings.save_log)
 
 # print memory usage
-log.logprint('memory usage (cpu): ' + log.memory_usage())
+log.logprint('memory usage (cpu): ' + log.cpu_memory_usage())
 
 # create timer object
 timer = Timer(log)
@@ -96,7 +96,7 @@ for ds_t, ds_v in zip(ds_train, ds_val):
 timer.stop('created dataloaders')
 
 # log memory usage
-log.logprint('...done, memory usage (cpu): ' + log.memory_usage())
+log.logprint('...done, memory usage (cpu): ' + log.cpu_memory_usage())
 
 # --------------------------------- DESIGN ---------------------------------- #
 
