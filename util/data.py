@@ -173,10 +173,6 @@ class _Subset(torch.utils.data.Dataset):
         self.transform = transform
 
     def __getitem__(self, idx):
-        dat = self.dataset[self.indices[idx]]
-        samp = _load_sample(dat)
-        samp_t = self.transform(samp)
-
         return self.transform(_load_sample(self.dataset[self.indices[idx]]))
 
     def __len__(self):

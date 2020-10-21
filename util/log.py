@@ -88,7 +88,7 @@ class Log:
     @staticmethod
     def memory_usage(indent: str = '') -> str:
         s = indent + 'cpu: %s\n' % Log.cpu_memory_usage()
-        s += indent + 'gpu: %s\n' % Log.gpu_memory_usage()
+        s += indent + 'gpu: %s' % Log.gpu_memory_usage()
         return s
 
     @staticmethod

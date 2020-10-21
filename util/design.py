@@ -10,15 +10,27 @@ import torch
 import torch.nn as nn
 import torch.optim
 import torch.utils.data
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 
 import models
 import settings
 from .data import Dataset
 from .log import Log
-# from .performance import MsePerSubEpoch, PerformanceParameter3D
 from util.performance import Performance
 from .progress import Progress
+
+
+class MsePerSample:
+    def __init__(self, img_res):
+        if img_res is None:
+            return
+        self.mse_loss = nn.MSELoss(reduction='none')
+        self.scalar = 1 / img_res ** 2
+
+    def __call__(self, batch_pred, batch_true):
+        return (torch.sum(
+            self.mse_loss(batch_pred, batch_true), dim=[1, 2, 3]
+        ) * self.scalar).tolist()
 
 
 class Design:
@@ -57,13 +69,14 @@ class Design:
         self._lr_sched = None
         self._log: Log = None
         self._epoch_start = None
-        self._epoch_current = None
+        self.epoch_current = None
         self._epoch_stop = None
         self._timer = None
         self.performance: Performance = None
         self.saved_after_epoch = None
         self.n_batches = None
         self.idx_batch = None
+        self._mse_per_sample = MsePerSample(None)
         torch.manual_seed(self._torch_seed)
 
     def create(self,
@@ -83,7 +96,7 @@ class Design:
         self._lr_sched = lr_scheduler
         self._log = log
         self._epoch_start = 0
-        self._epoch_current = 0
+        self.epoch_current = 0
         self._epoch_stop = epochs
 
         # performance parameters
@@ -95,14 +108,12 @@ class Design:
         self.performance = Performance(n_validation_samples)
 
         # log
-        # todo: expand upon information that is being logged
         log.logprint(self.info())
-        log.logprint('...done')
-        exit()
 
         return self
 
     def info(self):
+        # todo: show number of cpu cores, clock frequency, and cpu usage
         # number of training and validation samples per subset:
         nt, nv = [], []
         for dlt, dlv in zip(self._dl_train, self._dl_val):
@@ -119,18 +130,13 @@ class Design:
         s += '  dataset:\n'
         s += '    number of subsets: %i\n' % settings.n_subsets
         s += '    size total: %i \n' % len(self._dl_train[0].dataset.dataset)
-        s += '    size train: %i (%.0f%%) [%s]\n' % \
-             (sum(nt), settings.train_pct, ','.join(map(str, nt)))
-        s += '    size valid: %i (%.0f%%) [%s]\n' % \
-             (sum(nv), 100 - settings.train_pct, ','.join(map(str, nv)))
+        s += '    size train: %i (%.0f%%), subset_min:%i subset_max:%i]\n' % \
+             (sum(nt), settings.train_pct, min(nt), max(nt))
+        s += '    size valid: %i (%.0f%%), subset_min:%i subset_max:%i]\n' % \
+             (sum(nv), 100 - settings.train_pct, min(nt), max(nt))
         s += '  number of model parameters: %s\n' % '{:,}'.format(n_par)
         s += '  memory usage\n' + self._log.memory_usage(' ' * 4)
-
         return s
-
-    def gpu_memory(self):
-        s = ''
-        s += ''
 
     def get_epoch_stop(self) -> int:
         """
@@ -142,7 +148,7 @@ class Design:
         """
         Get epoch at which the training stops
         """
-        return self._epoch_current
+        return self.epoch_current
 
     @staticmethod
     def get_available_modelnames() -> Tuple[str]:
@@ -188,6 +194,7 @@ class Design:
             models_.append(cls.get_model_from_name(name))
         return models_
 
+    # todo: obsolete ?
     # @classmethod
     # def get_default_dataloaders(
     #         cls,
@@ -212,8 +219,8 @@ class Design:
         """
 
         # stopping epoch can't be set before current epoch
-        if epoch_stop <= self._epoch_current:
-            epoch_stop = self._epoch_current
+        if epoch_stop <= self.epoch_current:
+            epoch_stop = self.epoch_current
 
         # set epoch stop
         self._epoch_stop = epoch_stop
@@ -287,8 +294,8 @@ class Design:
                                        map_location=torch.device('cpu')))
         except RuntimeError:
             # if failed, try loading the backup
-            print('WARNING: loading file %s failed, trying to load backup' %
-                  file)
+            self._log.logprint('WARNING: loading file %s failed, trying '
+                               'to load backup' % file)
             if isinstance(backup, str):
                 backup = Path(backup)
             if not backup.exists():
@@ -297,16 +304,12 @@ class Design:
 
             self._from_dict(torch.load(backup,
                                        map_location=torch.device('cpu')))
-            print('INFO: successfully loaded backup')
+            self._log.logprint('INFO: successfully loaded backup')
 
         # set non serializable attributes
         self._log = log
         self._dl_train = dl_train
         self._dl_val = dl_val
-
-        # add 1 to current epoch, otherwise the last iteration will be run
-        # again
-        self._epoch_current += 1
 
         return self
 
@@ -320,13 +323,16 @@ class Design:
         timer = Timer(self._log)
         self._timer = timer
 
-        # initialize progress display/saver
-        # res_img_out = self._dl_train[0].dataset.shapes[Dataset.KEY.OUTPUT][1]
-        res_img_out = 64  # todo: make this dynamic
+        # get the resolution of the output images (assuming they are square)
+        sample = self._dl_train[0].dataset.__getitem__(0)
+        img_res = sample[Dataset.KEY.OUTPUT].shape[1]
+        del sample
+
         timer.start()
-        progress = Progress(progress_settings, self, self._log,
-                            res_img_out)
+        progress = Progress(progress_settings, self, self._log, img_res)
         timer.stop('created progress obj')
+
+        self._mse_per_sample = MsePerSample(img_res)
 
         # load previous model state if needed
         timer.start()
@@ -340,7 +346,7 @@ class Design:
             timer.stop('loaded design')
 
         # reset starting epoch
-        self._epoch_start = self._epoch_current
+        self._epoch_start = self.epoch_current
 
         # move model to gpu/cpu
         timer.start()
@@ -350,59 +356,39 @@ class Design:
         # start timer
         self._timer.start()
 
+        # print memory before starting to train
+        self._log.logprint('memory usage before training: \n'
+                           + self._log.memory_usage(' ' * 2))
+
         # loop over epochs
         for epoch in range(int(self._epoch_start), self._epoch_stop):
 
             # loop over training and validation subsets
             for idx, (dl_t, dl_v) in enumerate(zip(self._dl_train,
                                                    self._dl_val)):
-                # if the model was loaded, skip until current epoch has been
-                # reached
-                ec = epoch + idx / len(self._dl_train)
-                if ec < self._epoch_current:
+                # continue till current epoch is reached
+                if (epoch + idx / len(self._dl_train)) < self.epoch_current:
                     continue
-                self._epoch_current = epoch + idx / len(self._dl_train)
-
-                # memory before training
-                self._log.logprint('  memory usage (cpu): ' +
-                                   self._log.cpu_memory_usage())
-                if torch.cuda.is_available():
-                    self._log.logprint('  memory usage (gpu): \n' +
-                                       torch.cuda.memory_summary())
 
                 # train
                 timer.start()
                 self.train_subset(dl_t)
                 timer.stop('finished training')
 
-                # memory after train subset
-                self._log.logprint('  memory usage (cpu): ' +
-                                   self._log.cpu_memory_usage())
-                if torch.cuda.is_available():
-                    self._log.logprint('  memory usage (gpu): \n' +
-                                       torch.cuda.memory_summary())
-
                 # evaluate
                 timer.start()
-                img_true, img_pred = self.evaluate_subset(dl_v)
+                self.evaluate_subset(dl_v, progress)
                 timer.stop('finished validating')
 
-                # memory after validation subset
-                self._log.logprint('  memory usage (cpu): ' +
-                                   self._log.cpu_memory_usage())
-                if torch.cuda.is_available():
-                    self._log.logprint('  memory usage (gpu): \n' +
-                                       torch.cuda.memory_summary())
-
                 # save progress
-                progress(img_true, img_pred)
+                timer.start()
+                self.epoch_current = epoch + (idx + 1) / len(self._dl_train)
+                progress()
+                timer.stop('saved progress')
 
-            # memory after 1 epoch
-            self._log.logprint('  memory usage (cpu): ' +
-                               self._log.cpu_memory_usage())
-            if torch.cuda.is_available():
-                self._log.logprint('  memory usage (gpu): \n' +
-                                   torch.cuda.memory_summary())
+            # print memory usage after each full epoch
+            self._log.logprint('memory usage:\n' +
+                               self._log.memory_usage(' ' * 2))
 
             # # evaluate
             # img_true, img_pred, mse_valid, mse_p, tae_p = self._evaluate()
@@ -434,7 +420,7 @@ class Design:
 
         # epoch current isn't updated after the last iteration, so this has
         # to be done manually
-        self._epoch_current += 1
+        self.epoch_current += 1
 
         # move model back to cpu
         self._model = self._model.cpu()
@@ -499,13 +485,14 @@ class Design:
 
         # update performance parameter
         timer.start()
-        self.performance.mse_train.append(epoch=self._epoch_current,
+        self.performance.mse_train.append(epoch=self.epoch_current,
                                           mse_train=mse)
         timer.stop('updated performance parameter')
 
-    def evaluate_subset(self, dataloader: DataLoader):
+    def evaluate_subset(self, dataloader: DataLoader, progress: Progress):
         """
-        evaluate model on validation dataset
+        evaluate model on validation dataset. the progress object is needed
+        to write the evaluated images to its preview-buffer
         """
 
         timer = Timer(self._log).start()
@@ -545,29 +532,29 @@ class Design:
                 loss = self._loss_function(yp, yt)
                 timer_.stop('calculated loss')
 
-                # update performance parameter
+                # calculate/append performance parameter (mse per sample)
                 timer_.start()
                 self.performance.loss_valid.append(
-                    epoch=self._epoch_current,
-                    loss=loss,
+                    epoch=self.epoch_current,
+                    mse_sample=self._mse_per_sample(yp, yt),
                     sample_idx=data[Dataset.KEY.INDEX]
                 )
                 timer_.stop('added performance parameter (loss_valid)')
+
+                # add predicted and true images to progress-preview
+                progress.add_imgs_to_preview_buffer(yp, yt)
 
                 # calculate mse
                 timer_.start()
                 mse += loss.cpu().detach().item() / n_batches
                 timer_.stop('calculated mse')
-
                 timer.stop('calculated 1 validation batch')
 
         # update performance parameter
         timer.start()
-        self.performance.mse_valid.append(epoch=self._epoch_current,
-                                          mse_train=mse)
+        self.performance.mse_valid.append(epoch=self.epoch_current,
+                                          mse_valid=mse)
         timer.stop('updated performance parameter (mse_valid)')
-
-        return yt, yp
 
     @staticmethod
     def _calc_tae(img_err):

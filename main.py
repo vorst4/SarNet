@@ -52,8 +52,6 @@ log.logprint('memory usage (cpu): ' + log.cpu_memory_usage())
 # create timer object
 timer = Timer(log)
 
-log.logprint(log.memory_usage())
-
 # --------------------------------- DATASET --------------------------------- #
 
 # log

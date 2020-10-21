@@ -10,7 +10,7 @@ class Performance:
         self.n_validation_samples = n_validation_samples
         self.mse_train = _MseTrain()
         self.mse_valid = _MseValid()
-        self.loss_valid = _LossValid(n_validation_samples)
+        self.loss_valid = _MseSampleValid(n_validation_samples)
 
     def to_dict(self):
         return {
@@ -23,8 +23,8 @@ class Performance:
     @classmethod
     def load(cls, dictionary):
         obj = cls(dictionary['n_validation_samples'])
-        obj.mse_train = _MseTrain.load(dictionary)
-        obj.mse_valid = _MseValid.load(dictionary)
+        obj.mse_train = _MseTrain.load(dictionary['mse_train'])
+        obj.mse_valid = _MseValid.load(dictionary['mse_valid'])
         return obj
 
 
@@ -40,9 +40,7 @@ class _List:
 
     @staticmethod
     def load(cls, dictionary: dict):
-        obj = cls(dictionary['x_label'],
-                  dictionary['y_label'],
-                  dictionary['size'])
+        obj = cls()
         obj.x = dictionary['x']
         obj.y = dictionary['y']
         obj.idx = dictionary['idx']
@@ -80,8 +78,14 @@ class _List:
         self.x.extend([-1] * (n - n0))
         self.y.extend([-1] * (n - n0))
 
-    def __call__(self):
-        return self.x[:self.idx], self.y[:self.idx]
+    def __call__(self, idx=None):
+        if idx is None:
+            return self.x[:self.idx], self.y[:self.idx]
+        else:
+            idx = self.idx + idx if idx < 0 else idx
+            if idx >= self.idx or idx < 0:
+                raise ValueError('index error')
+            return self.x[idx], self.y[idx]
 
     def __len__(self):
         return self.idx
@@ -200,18 +204,21 @@ class _MseValid(_List):
         return super().load(cls, dictionary)
 
 
-class _LossValid(_DoubleList):
+class _MseSampleValid(_DoubleList):
+    """
+    MSE of each individual sample from the validation set, per epoch.
+    """
     def __init__(self, n_validation_samples):
         super().__init__(x_label='epoch',
-                         y_label='loss_valid',
+                         y_label='mse',
                          z_label='sample_idx',
                          shape=(settings.epochs * settings.n_subsets,
                                 n_validation_samples),
                          )
         self.n_validation_samples = n_validation_samples
 
-    def append(self, epoch, loss, sample_idx):
-        super().append(epoch, loss, sample_idx)
+    def append(self, epoch, mse_sample, sample_idx):
+        super().append(epoch, mse_sample, sample_idx)
 
     @classmethod
     def load(cls, dictionary):

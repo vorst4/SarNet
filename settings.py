@@ -14,14 +14,14 @@ if is_running_on_desktop:
     save_log = False
 
     # log the timer or not
-    log_timer = True
+    log_timer = False
 
     # train percentage (float): percentage of the dataset that is to be used
     #   for training, the rest is used for evaluation.
-    train_pct = 99  # in percent
+    train_pct = 50  # in percent
 
     # batch size (int)
-    batch_size = 128
+    batch_size = 16
 
     # number of train/valid subsets
     #   The evaluation set (can be) split into N unique subsets that are
@@ -37,8 +37,7 @@ if is_running_on_desktop:
 
     # length of dataset (float): maximum length (in samples) of the dataset
     #   to be used, set to None to use the whole dataset
-    # len_dataset = 10000
-    len_dataset = None
+    len_dataset = 100
 
     # batch normalisation settings
     batch_norm = {'momentum': 0.99, 'eps': 1e-3}
@@ -52,11 +51,11 @@ if is_running_on_desktop:
         print_=True,
         lossplot=False,
         preview=False,
-        load_design=False,
-        save_design=False,
-        path='C:/Users/Dennis/Documents/tmp',
-        save_lossplot=False,
-        save_preview=False,
+        load_design=True,
+        save_design=True,
+        path='C:/Users/Dennis/Documents/desktop_resnet_output',
+        save_lossplot=True,
+        save_preview=True,
     )
 
 # -----------------------------------------------------------------------------
@@ -69,11 +68,11 @@ else:
     save_log = True
 
     # log the timer or not
-    log_timer = True
+    log_timer = False
 
     # train percentage (float): percentage of the dataset that is to be used
     #   for training, the rest is used for evaluation.
-    train_pct = 98  # in percent
+    train_pct = 90  # in percent
 
     # batch size (int)
     batch_size = 128
@@ -85,7 +84,7 @@ else:
     #   Thus, evaluating the dataset at multiple times during an epoch can
     #   provide more information on how the network is improving during
     #   training.
-    n_subsets = 10
+    n_subsets = 10000
 
     # path of dataset (str): the path at which the dataset csv file is located.
     path_dataset = 'dataset_sar/dataset.csv'

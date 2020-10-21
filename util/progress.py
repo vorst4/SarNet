@@ -38,7 +38,6 @@ class Progress:
                      save_design: bool = False,
                      save_lossplot: bool = False,
                      save_preview: bool = False,
-                     save_interval: float = 10,  # todo: has become obsolete
                      path: Union[str, Path] = None,
                      filename_design: str = 'design.pt',
                      n_backups: int = 3,
@@ -60,8 +59,6 @@ class Progress:
                 during training or not
             :param preview: (bool) to display preview or not, the preview
                 contains several true and predicted validation images.
-            :param save_interval (int) interval in minutes after which the
-                model is saved
             :param load_design: (bool) to load or ignore the previous
                 design: at "path + filename_design"
             :param save_design: (bool) to save design at "path +
@@ -95,7 +92,6 @@ class Progress:
             self.save_design = save_design
             self.save_lossplot = save_lossplot
             self.save_preview = save_preview
-            self.save_interval = save_interval
             self.path = path
             self.filename_design = filename_design
             self.filename_best_design = filename_best_design
@@ -175,8 +171,9 @@ class Progress:
 
         # pre-allocate space to speed up the script
         self.imgs = np.zeros((self.n_imgs, 2, self.res2, self.res2))
-        self.img_ = np.zeros((2 * hstack, vstack * self.res2, self.res2))
+        # self.img_ = np.zeros((2 * hstack, vstack * self.res2, self.res2))
         self.img_ = np.zeros((vstack * self.res2, 2 * hstack * self.res2))
+        self.img_idx = 0
 
         # create plot window
         if self.settings.preview:
@@ -184,11 +181,32 @@ class Progress:
             plt.axis('off')
             plt.show()
 
-    def __call__(self, yt_val, yp_val, mse_batch=None):
+    def add_imgs_to_preview_buffer(self, imgs_pred, imgs_true):
+
+        # do not add imgs to buffer if buffer is already full
+        if self.img_idx == self.n_imgs:
+            return
+
+        p = self.settings.preview_padding
+        for idx in range(imgs_pred.shape[0]):
+            # add predicted and true img to buffer (with padding)
+            self.imgs[self.img_idx, 0, p:-p, p:-p] = \
+                imgs_true[idx, 0, :, :].cpu().detach().numpy()
+            self.imgs[self.img_idx, 1, p:-p, p:-p] = \
+                imgs_pred[idx, 0, :, :].cpu().detach().numpy()
+
+            # update img index/counter
+            self.img_idx += 1
+
+            # stop if buffer is full
+            if self.img_idx >= self.n_imgs:
+                break
+
+    def __call__(self):
 
         # print progress, if desired
         if self.settings.print:
-            self._print(mse_batch)
+            self._print()
 
         # save design, if path is given
         if self.settings.save_design:
@@ -198,7 +216,7 @@ class Progress:
             # if the last validation loss is the lowest, also save it as
             # 'best' design (if epoch is finished)
             if self.design.saved_after_epoch:
-                _, lv = self.design.get_valid_mse_per_epoch()
+                _, lv = self.design.performance.mse_valid()
                 if lv[-1] == min(lv):
                     self.design.save(self.path_best_design,
                                      backups=self.path_best_design_backup)
@@ -210,7 +228,7 @@ class Progress:
 
         # preview
         if self.settings.preview or self.settings.save_preview:
-            self._preview(yt_val, yp_val)
+            self._preview()
 
     @staticmethod
     def _get_paths(settings: Settings) -> {}:
@@ -252,28 +270,18 @@ class Progress:
             'preview': settings.path.joinpath(settings.subdir_preview),
         }
 
-    def _print(self, mse_batch):
+    def _print(self):
         """
         Print progress
         """
-        ec = self.design.get_epoch_current()
+        ec = self.design.epoch_current
         es = self.design.get_epoch_stop()
-        bi = self.design.idx_batch
-        bt = self.design.n_batches
-        if mse_batch is None:
-            _, lt = self.design.get_train_mse_per_epoch()
-            lt = lt[-1]
-            _, lv = self.design.get_valid_mse_per_epoch()
-            lv = lv[-1]
-            self.log.logprint(
-                'Epoch:%3.0f/%i, Batch:%i/%i, loss_train: %3.12f, loss_val: '
-                '%3.12f' % (ec, es, bi, bt, lt, lv)
-            )
-        else:
-            self.log.logprint(
-                'Epoch:%3.0f/%i, Batch:% 3i/%i, mse_batch: %3.12f'
-                % (ec - 1, es, bi, bt, mse_batch)
-            )
+        _, lt = self.design.performance.mse_train(idx=-1)
+        _, lv = self.design.performance.mse_valid(idx=-1)
+        self.log.logprint(
+            'Epoch:%3.2f/%i, loss_train: %3.8f, loss_val: %3.8f' %
+            (ec, es, lt, lv)
+        )
 
     def _lossplot(self):
         """
@@ -281,8 +289,8 @@ class Progress:
         """
 
         # update lossplot
-        et, lt = self.design.get_train_mse_per_epoch()
-        ev, lv = self.design.get_valid_mse_per_epoch()
+        et, lt = self.design.performance.mse_train()
+        ev, lv = self.design.performance.mse_valid()
         self.line_train.set_xdata(et)
         self.line_train.set_ydata(lt)
         self.line_val.set_xdata(ev)
@@ -307,34 +315,30 @@ class Progress:
         if self.settings.save_lossplot:
             fig.savefig(self.path_lossplot)
 
-    def _preview(self, imgs_true, imgs_pred):
+    def _preview(self):
         """
         update display and/or save preview, preview being a side by side
         comparison of (multiple) true output images
         and predictions.
         """
 
-        # make sure imgs has the right shape
-        self.imgs = self.imgs.reshape((-1, 2, self.res2, self.res2))
-
-        # extract n_imgs from yt_val and yp_val, and pad them, the padded
-        # result is stored in <imgs>
-        p = self.settings.preview_padding
-        self.imgs[:, 0, p:-p, p:-p] = imgs_true.cpu().detach().numpy()[
-                                      :self.n_imgs, 0, :, :]
-        self.imgs[:, 1, p:-p, p:-p] = imgs_pred.cpu().detach().numpy()[
-                                      :self.n_imgs, 0, :, :]
+        # reset buffer counter
+        self.img_idx = 0
 
         # currently <imgs> is a matrix with images. The matrix has two
         # columns with the true images on the first
         # column and the predicted imgs on the second. Reshape this matrix
         # to a grid pattern of side-by-side comparison
-        hstack, vstack = self.settings.preview_hstack, self.settings.preview_vstack
+        hstack = self.settings.preview_hstack
+        vstack = self.settings.preview_vstack
         self.imgs = self.imgs.reshape(vstack, 2 * hstack, self.res2, self.res2)
 
         # concatenate to create one big image
         self.img_ = np.concatenate(self.imgs, axis=1)
         self.img = np.concatenate(self.img_, axis=1)
+
+        # reshape imgs back to original shape
+        self.imgs = self.imgs.reshape((-1, 2, self.res2, self.res2))
 
         # clip to [0, 1]
         self.img = _clip(self.img, 0, 1)
@@ -348,8 +352,7 @@ class Progress:
         if self.settings.save_preview:
             path = self.dir_preview.joinpath(
                 self.settings.filename_prefix_preview +
-                str(self.design.get_epoch_current() + 1) +
-                ' b%i-%i' % (self.design.idx_batch, self.design.n_batches) +
+                '%.4f' % self.design.get_epoch_current() +
                 self.settings.filename_postfix_preview)
             Image.fromarray((255.0 * self.img).astype(np.uint8)).save(path)
 
