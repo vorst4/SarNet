@@ -127,7 +127,7 @@ class Design:
         s += '  memory usage (cpu): %s\n' % self._log.memory_usage()
 
         if torch.cuda.is_available():
-            mem = torch.cuda.get_device_properties(self.device).total_memory()
+            mem = torch.cuda.get_device_properties(self.device).total_memory
             s += '  memory available (gpu): %i\n' % mem
             # s += '  memory usage (gpu): \n' + torch.cuda.memory_summary()
         else:
