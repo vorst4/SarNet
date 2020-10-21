@@ -109,12 +109,9 @@ class Dataset:
         # read dataset.csv into a nested list
         self.dataset = pandas.read_csv(
             dataset_file,
-            delimiter=csv_delimiter
+            delimiter=csv_delimiter,
+            nrows=n_max,
         ).values.tolist()
-
-        # limit dataset to n_max
-        if n_max is not None:
-            self.dataset = self.dataset[:n_max]
 
         # set dataset length
         self.len = len(self.dataset)
