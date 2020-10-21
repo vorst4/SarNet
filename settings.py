@@ -72,7 +72,7 @@ else:
 
     # train percentage (float): percentage of the dataset that is to be used
     #   for training, the rest is used for evaluation.
-    train_pct = 95  # in percent
+    train_pct = 90  # in percent
 
     # batch size (int)
     batch_size = 128 * 2
@@ -84,7 +84,7 @@ else:
     #   Thus, evaluating the dataset at multiple times during an epoch can
     #   provide more information on how the network is improving during
     #   training.
-    n_subsets = 1000
+    n_subsets = 1000  # 10
 
     # path of dataset (str): the path at which the dataset csv file is located.
     path_dataset = 'dataset_sar/dataset.csv'
