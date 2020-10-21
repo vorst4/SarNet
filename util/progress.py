@@ -183,7 +183,7 @@ class Progress:
 
     def add_imgs_to_preview_buffer(self, imgs_pred, imgs_true):
 
-        # do not add imgs to buffer if buffer is already full
+        # return if the buffer is already full
         if self.img_idx == self.n_imgs:
             return
 

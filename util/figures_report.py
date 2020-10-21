@@ -48,7 +48,7 @@ def _change_default_figure_settings():
     plt.rcParams["lines.linewidth"] = 1
 
     plt.rcParams['savefig.pad_inches'] = 0
-    plt.rcParams['savefig.format'] = 'pdf'
+    plt.rcParams['savefig.format_byte'] = 'pdf'
     plt.rcParams['savefig.bbox'] = 'tight'
 
     plt.rcParams['xtick.major.width'] = 0.5

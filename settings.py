@@ -68,7 +68,7 @@ else:
     save_log = True
 
     # log the timer or not
-    log_timer = False
+    log_timer = True
 
     # train percentage (float): percentage of the dataset that is to be used
     #   for training, the rest is used for evaluation.

@@ -91,7 +91,7 @@ for ds_t, ds_v in zip(ds_train, ds_val):
         DataLoader(ds_t, settings.batch_size, shuffle=True)
     )
     dl_val.append(
-        DataLoader(ds_v, settings.batch_size, shuffle=False)
+        DataLoader(ds_v, settings.batch_size, shuffle=True)
     )
 timer.stop('created dataloaders')
 

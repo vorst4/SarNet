@@ -93,7 +93,7 @@ class Log:
 
     @staticmethod
     def cpu_memory_usage() -> str:
-        f = Log.format
+        f = Log.format_byte
         mem = psutil.virtual_memory()
         rss = psutil.Process(os.getpid()).memory_info().rss
         s = 'total=%s, used_sys=%s, used_py=%s, free=%s, pct=%.1f%%' % \
@@ -111,7 +111,7 @@ class Log:
             cache = torch.cuda.memory_reserved(device)
             free_cache = total - cache  # free for cache
             free_alloc = total - alloc  # free for tensors
-            f = Log.format
+            f = Log.format_byte
             s = ''
             s += '(%s) ' % name
             s += 'total=%s, ' % f(total)
@@ -126,7 +126,7 @@ class Log:
         return s
 
     @staticmethod
-    def format(size):
+    def format_byte(size):
         """
         Format number (bytes) to string such that it is easily readible for
         humans.
@@ -139,3 +139,7 @@ class Log:
             unit = unit_new
             size /= 1024
         return '%.2f %s' % (size, unit)
+
+    @staticmethod
+    def format_num(number):
+        return '{:,}'.format(number)

@@ -110,6 +110,7 @@ class _DoubleList:
         #  error on the server with var _MseSampleValid. this needs to be
         #  fixed. Maybe: save the data each epoch instead of keeping it in
         #  memory
+        #  maybe it's fixed now?
         self.x = [0.0] * shape[1] * shape[0]
         self.y = [0.0] * shape[1] * shape[0]
         self.z = [0.0] * shape[1] * shape[0]

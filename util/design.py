@@ -120,18 +120,22 @@ class Design:
         # number of parameters
         n_par = sum(p.numel() for p in self._model.parameters())
 
+        # abbreviate format_number function
+        f = self._log.format_num
+
         # create info String
         s = ''
         s += '  model: %s\n' % str(type(self._model))
         s += '  device: %s\n' % str(self.device)
         s += '  dataset:\n'
-        s += '    number of subsets: %i\n' % settings.n_subsets
-        s += '    size total: %i \n' % len(self._dl_train[0].dataset.dataset)
-        s += '    size train: %i (%.0f%%), subset_min:%i subset_max:%i]\n' % \
-             (sum(nt), settings.train_pct, min(nt), max(nt))
-        s += '    size valid: %i (%.0f%%), subset_min:%i subset_max:%i]\n' % \
-             (sum(nv), 100 - settings.train_pct, min(nt), max(nt))
-        s += '  number of model parameters: %s\n' % '{:,}'.format(n_par)
+        s += '    number of subsets: %s\n' % f(settings.n_subsets)
+        s += '    size total: %s \n' % \
+            f(len(self._dl_train[0].dataset.dataset))
+        s += '    size train: %s (%.0f%%), subset_min:%s subset_max:%s]\n' % \
+             (f(sum(nt)), settings.train_pct, f(min(nt)), f(max(nt)))
+        s += '    size valid: %s (%.0f%%), subset_min:%s subset_max:%s]\n' % \
+             (f(sum(nv)), 100 - settings.train_pct, f(min(nt)), f(max(nt)))
+        s += '  number of model parameters: %s\n' % f(n_par)
         s += '  memory usage\n' + self._log.memory_usage(' ' * 4)
         return s
 
