@@ -23,6 +23,10 @@ if is_running_on_desktop:
     # batch size (int)
     batch_size = 16
 
+    # shuffle datasets or not
+    shuffle_train = True
+    shuffle_valid = True
+
     # number of train/valid subsets
     #   The evaluation set (can be) split into N unique subsets that are
     #   evaluated at equal intervals during training. Reason is that 1 epoch
@@ -30,14 +34,14 @@ if is_running_on_desktop:
     #   Thus, evaluating the dataset at multiple times during an epoch can
     #   provide more information on how the network is improving during
     #   training.
-    n_subsets = 10
+    n_subsets = 500
 
     # path of dataset (str): the path at which the dataset csv file is located.
     path_dataset = 'C:/Users/Dennis/Documents/dataset_sar/dataset.csv'
 
     # length of dataset (float): maximum length (in samples) of the dataset
     #   to be used, set to None to use the whole dataset
-    len_dataset = 100
+    len_dataset = None
 
     # batch normalisation settings
     batch_norm = {'momentum': 0.99, 'eps': 1e-3}
@@ -76,6 +80,10 @@ else:
 
     # batch size (int)
     batch_size = 128 * 2
+
+    # shuffle datasets or not
+    shuffle_train = True
+    shuffle_valid = True
 
     # number of train/valid subsets
     #   The evaluation set (can be) split into N unique subsets that are

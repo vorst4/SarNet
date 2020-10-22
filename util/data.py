@@ -92,7 +92,9 @@ class Dataset:
                  csv_delimiter: str = ';',
                  n_max: int = None,
                  trans_train=None,
-                 trans_val=None
+                 trans_val=None,
+                 shuffle_train=True,
+                 shuffle_valid=False,
                  ):
         """
         Create instance of custom map-style PyTorch Dataset
@@ -101,6 +103,12 @@ class Dataset:
         :param csv_delimiter: (default: ';') delimiter used in the dataset
         csv file
         """
+
+        # set attributes
+        self.train_pct = train_pct
+        self.n_subsets = n_subsets
+        self.shuffle_train = shuffle_train
+        self.shuffle_valid = shuffle_valid
 
         # if dir is a <str>, create a pathlib.Path from it
         if isinstance(dataset_file, str):
@@ -134,26 +142,36 @@ class Dataset:
                 )
 
         # determine ids for validation/training dataset
-        ids_train = np.array_split(
-            np.arange(0, int(len(self) * train_pct / 100)), n_subsets
-        )
-        ids_val = np.array_split(
-            np.arange(int(len(self) * train_pct / 100), len(self)), n_subsets
-        )
+        self.ids_train = np.arange(0, int(len(self) * self.train_pct / 100))
+        self.ids_valid = np.arange(int(len(self) * self.train_pct / 100),
+                                   len(self))
+
+        # determine ids of training/validation subsets, and shuffle them
+        self.ids_train_subset = np.array_split(self.ids_train, self.n_subsets)
+        self.ids_valid_subset = np.array_split(self.ids_valid, self.n_subsets)
+        self.shuffle()
 
         # create validation/training datasets
         self.training = []
         self.validation = []
-        for ids_t, ids_v in zip(ids_train, ids_val):
-            self.training.append(_Subset(
-                self.dataset, ids_t, trans_train
-            ))
-            self.validation.append(_Subset(
-                self.dataset, ids_v, trans_val
-            ))
+        for ids_t, ids_v in zip(self.ids_train_subset, self.ids_valid_subset):
+            self.training.append(_Subset(self, ids_t, trans_train))
+            self.validation.append(_Subset(self, ids_v, trans_val))
 
     def __len__(self):
         return self.len
+
+    def shuffle(self):
+        """
+        This function shuffles the WHOLE training/validation dataset,
+        NOT each individual training/validation subset.
+
+        NOTE: the training/validation dataset are still kept separate.
+        """
+        if self.shuffle_train:
+            np.random.shuffle(self.ids_train)
+        if self.shuffle_valid:
+            np.random.shuffle(self.ids_valid)
 
 
 class _Subset(torch.utils.data.Dataset):
@@ -164,8 +182,9 @@ class _Subset(torch.utils.data.Dataset):
     KEY = KEY
     IDX = IDX
 
-    def __init__(self, dataset, indices, transform):
-        self.dataset = dataset
+    def __init__(self, ds_obj, indices, transform):
+        self.ds_obj = ds_obj
+        self.dataset = ds_obj.dataset
         self.indices = indices
         self.transform = transform
 

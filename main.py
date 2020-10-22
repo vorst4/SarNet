@@ -12,7 +12,6 @@ from util.design import Design
 from util.log import Log
 from util.timer import Timer
 
-
 # -------------------------------- ARGUMENTS -------------------------------- #
 # On the server, several parameters should be passed when running the
 # script, this is not necessary when running it on the desktop
@@ -77,6 +76,8 @@ ds = Dataset(
     train_pct=settings.train_pct,
     n_subsets=settings.n_subsets,
     n_max=settings.len_dataset,
+    shuffle_train=settings.shuffle_train,
+    shuffle_valid=settings.shuffle_valid,
     # trans_train=trans_train,  # todo: re-enable transformations (+validate)
     # trans_val=trans_val  # todo: re-enable transformations (+validate)
 )
@@ -89,10 +90,10 @@ dl_train = []
 dl_val = []
 for ds_t, ds_v in zip(ds_train, ds_val):
     dl_train.append(
-        DataLoader(ds_t, settings.batch_size, shuffle=True)
+        DataLoader(ds_t, settings.batch_size)
     )
     dl_val.append(
-        DataLoader(ds_v, settings.batch_size, shuffle=True)
+        DataLoader(ds_v, settings.batch_size)
     )
 timer.stop('created dataloaders')
 

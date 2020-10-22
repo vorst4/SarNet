@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 
 import models
 import settings
-from .data import Dataset
+from .data import Dataset, _Subset
 from .log import Log
 from util.performance import Performance
 from .progress import Progress
@@ -61,7 +61,7 @@ class Design:
 
     def __init__(self):
         self.n_phase = 360
-        self._dl_train = None
+        self._dl_train: List[_Subset] = None
         self._dl_val = None
         self._model = None
         self._loss_function = None
@@ -386,6 +386,10 @@ class Design:
                 self.epoch_current = epoch + (idx + 1) / len(self._dl_train)
                 progress()
                 timer.stop('saved progress')
+
+            # shuffle dataset, the DataLoader will only shuffle the subsets,
+            #   not the train/valid dataset as a whole
+            self._dl_train[0].dataset.shuffle()
 
             # print memory usage after each full epoch
             self._log.logprint('memory usage:\n' +

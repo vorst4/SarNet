@@ -182,25 +182,29 @@ class Progress:
             plt.show()
 
     def add_imgs_to_preview_buffer(self, imgs_pred, imgs_true):
-
-        # return if the buffer is already full
-        if self.img_idx == self.n_imgs:
+        # return if buffer is full
+        if self.img_idx >= self.n_imgs:
             return
 
+        # abbreviate padding variable
         p = self.settings.preview_padding
+
+        # loop through images (<batch_size> images should be given)
         for idx in range(imgs_pred.shape[0]):
-            # add predicted and true img to buffer (with padding)
+
+            # copy image into the array as a numpy matrix, also make sure it
+            #   isn't using up GPU memory
             self.imgs[self.img_idx, 0, p:-p, p:-p] = \
                 imgs_true[idx, 0, :, :].cpu().detach().numpy()
             self.imgs[self.img_idx, 1, p:-p, p:-p] = \
                 imgs_pred[idx, 0, :, :].cpu().detach().numpy()
 
-            # update img index/counter
+            # update image counter
             self.img_idx += 1
 
-            # stop if buffer is full
+            # return if buffer is full
             if self.img_idx >= self.n_imgs:
-                break
+                return
 
     def __call__(self):
 
@@ -277,7 +281,7 @@ class Progress:
         _, lt = self.design.performance.mse_train(idx=-1)
         _, lv = self.design.performance.mse_valid(idx=-1)
         self.log.logprint(
-            'Epoch:%3.2f/%i, loss_train: %3.8f, loss_val: %3.8f' %
+            'Epoch:%8.4f/%i, loss_train: %3.8f, loss_val: %3.8f' %
             (ec, es, lt, lv)
         )
 

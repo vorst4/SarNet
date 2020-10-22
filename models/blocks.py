@@ -11,6 +11,13 @@ _last_channels_out = None
 _last_resolution_out = None
 
 
+class Forward(nn.Module, ABC):
+
+    @staticmethod
+    def forward(x):
+        return x
+
+
 class Conv2d(nn.Module, ABC):
 
     def __init__(self,
@@ -199,6 +206,8 @@ class IResBlock(nn.Module, ABC):
 
     EXPANSION = 6
 
+    DROPOUT_RATE = 0.3
+
     def __init__(self,
                  co: int,
                  ci: int = None,
@@ -294,6 +303,9 @@ class IResBlock(nn.Module, ABC):
             nn.Hardswish()
         )
 
+        # dropout (to add stochastic depth)
+        self.dropout = nn.Dropout2d(self.DROPOUT_RATE)
+
         # upsample/downsample identity, if needed
         if upsample or downsample or ci != co:
             conv = nn.ConvTranspose2d if upsample else nn.Conv2d
@@ -302,6 +314,8 @@ class IResBlock(nn.Module, ABC):
                                  kernel_size=2 if upsample else 1,
                                  stride=s,
                                  padding=0)
+        else:
+            self.identity = Forward()
 
         # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
@@ -352,18 +366,17 @@ class IResBlock(nn.Module, ABC):
         x = self.project(x)
         # timer.stop('\t\t\tforwarded through projection')
 
+        # dropout
+        # timer.start()
+        x = self.dropout(x)
+        # timer.stop('\t\t\tForwarded through dropout')
+
         # add identity to x, upsample/downsample it if required
         # timer.start()
-        if self.upsample or self.downsample or self.ci != self.co:
-            # x = x + self.identity(i)
-            # timer.stop('\t\t\tforwarded : added (changed) identity')
-            # timer2.stop('\t\t\tforwarded: inverse resnet block')
-            return x + self.identity(i)
-        else:
-            # x = x + i
-            # timer2.stop('\t\t\tforwarded: inverse resnet block')
-            # timer.stop('\t\t\tforwarded: added (unchanged) identity')
-            return x + i
+        # x = x + self.identity(i)
+        # timer.stop('\t\t\tforwarded : added (changed) identity')
+        # timer2.stop('\t\t\tforwarded: inverse resnet block')
+        return x + self.identity(i)
 
 
 class TransposeResNetBlock(nn.Module, ABC):
