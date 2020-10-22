@@ -7,6 +7,7 @@ from .blocks import Reshape, IResBlock, Combine, LinBnHs, \
 from util.timer import Timer
 from util.log import Log
 
+
 class ResNetAE1(nn.Module, ABC):
     lr_ideal = 1e-5
 
@@ -34,7 +35,7 @@ class ResNetAE1(nn.Module, ABC):
         # bottleneck
         ch = 1024
         self.bottleneck = nn.Sequential(
-            LinBnHs(ci=1024 * 1 + 24, co=ch*2),
+            LinBnHs(ci=1024 * 1 + 24, co=ch * 2),
         )
 
         # self.decoder = nn.Sequential(
@@ -50,7 +51,7 @@ class ResNetAE1(nn.Module, ABC):
         # )
 
         self.decoder = nn.Sequential(
-            Reshape(channels=512, resolution=2),
+            Reshape(c=512, ro=2),
             IResBlock(ci=512, co=128, ri=2, k=2, expand=False, upsample=True),
             IResBlock(ci=128, co=64, ri=4, k=2, upsample=True),
             IResBlock(ci=64, co=32, ri=8, k=4, upsample=True),

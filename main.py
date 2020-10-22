@@ -34,7 +34,8 @@ else:
 
 # ----------------------------------- MISC ---------------------------------- #
 # models to be run
-modelname = ['ResNetAE1', 'ConvAE1', 'DenseAE1'][job_id]
+# modelname = ['ResNetAE1', 'ConvAE1', 'DenseAE1'][job_id]
+modelname = 'ResNetAE2'
 
 # set/create root path from modelname
 settings.progress_settings.path += '/' + modelname

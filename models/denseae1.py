@@ -39,7 +39,7 @@ class DenseAE1(nn.Module, ABC):
             LinBnHs(co=ch),
             LinBnHs(co=ch * 2),
             LinBnHs(co=64 * 64),
-            Reshape(channels=1, resolution=64)
+            Reshape(c=1, ro=64)
         )
 
     def forward(self, input_img, input_meta):

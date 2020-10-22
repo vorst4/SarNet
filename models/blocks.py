@@ -8,6 +8,35 @@ from util.timer import Timer
 from util.log import Log
 
 _last_channels_out = None
+_last_resolution_out = None
+
+
+class Conv2d(nn.Module, ABC):
+
+    def __init__(self,
+                 ci,  # channels input
+                 co,  # channels output
+                 k=3,  # kernel size
+                 s=1,  # stride
+                 p=0,  # padding
+                 d=1,  # dilation
+                 groups=1,
+                 bias=False,
+                 mode='zeros'
+                 ):
+        super().__init__()
+        self.conv2d = nn.Conv2d(in_channels=ci,
+                                out_channels=co,
+                                kernel_size=k,
+                                stride=s,
+                                padding=p,
+                                dilation=d,
+                                groups=g,
+                                bias=bias,
+                                padding_mode=mode)
+
+    def forward(self, x):
+        return self.conv2d(x)
 
 
 class Combine(nn.Module, ABC):
@@ -22,9 +51,13 @@ class Combine(nn.Module, ABC):
 
 class Reshape(nn.Module, ABC):
 
-    def __init__(self, channels, resolution):
+    def __init__(self, co, ro):
         super().__init__()
-        self.shape = (-1, channels, resolution, resolution)
+        self.shape = (-1, co, ro, ro)
+
+        # set globals
+        global _last_channels_out, _last_resolution_out
+        _last_channels_out, _last_resolution_out = co, ro
 
     def forward(self, x):
         return x.reshape(self.shape)
@@ -33,12 +66,11 @@ class Reshape(nn.Module, ABC):
 class LinBnHs(nn.Module, ABC):
     def __init__(
             self,
+            co: int,  # number of output channels
             ci: int = None,  # number of input channels
-            co: int = None  # number of output channels
     ):
         super().__init__()
         global _last_channels_out
-        assert co is not None, 'please provide co (number of output channels)'
         ci = _last_channels_out if ci is None else ci
         _last_channels_out = co
 
@@ -168,9 +200,9 @@ class IResBlock(nn.Module, ABC):
     EXPANSION = 6
 
     def __init__(self,
-                 ci: int,
                  co: int,
-                 ri: int,
+                 ci: int = None,
+                 ri: int = None,
                  k: [3, 5, 7] = 3,
                  downsample: bool = False,
                  upsample: bool = False,
@@ -180,37 +212,40 @@ class IResBlock(nn.Module, ABC):
         # misc
         super().__init__()
         assert not (downsample & upsample), "cannot be True at the same time"
-        self.expand = expand
-        self.upsample = upsample
-        self.downsample = downsample
-        self.ci = ci
-        self.co = co
-        self.squeeze_and_excite = squeeze
+        global _last_channels_out, _last_resolution_out
+
+        # If ci/ri not provided: use co/ro of the block that was created last
+        ci = _last_channels_out if ci is None else ci
+        ri = _last_resolution_out if ri is None else ri
 
         # determine stride
-        self.stride = 2 if downsample or upsample else 1
+        s = 2 if downsample or upsample else 1
 
         # determine output resolution
         if downsample:
-            ro = int(0.5 * ri)
+            ro = ri // 2
         elif upsample:
-            ro = 2 * ri
+            ro = ri * 2
         else:
             ro = ri
 
+        # set globals co and ro
+        _last_channels_out = co
+        _last_resolution_out = ro
+
         # determine padding
-        self.padding = int((k - 1) * 0.5)
+        p = int((k - 1) * 0.5)
 
         # determine type of convolutional filter to use
         conv = self.transpose_conv if upsample else nn.Conv2d
 
         # determine number of 'depth-wise' channels
-        ch_depth = self.EXPANSION if self.expand else 1
+        ch_depth = self.EXPANSION if expand else 1
 
         # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
         # expand narrow input to a wide layer
-        if self.expand:
+        if expand:
             self.expand_conv = nn.Sequential(
                 nn.Conv2d(in_channels=ci,
                           out_channels=ci * ch_depth,
@@ -227,15 +262,15 @@ class IResBlock(nn.Module, ABC):
                  out_channels=ci * ch_depth,
                  groups=ci * ch_depth,
                  kernel_size=k,
-                 stride=self.stride,
-                 padding=self.padding,
+                 stride=s,
+                 padding=p,
                  bias=False),
             nn.BatchNorm2d(num_features=ci * ch_depth, **settings.batch_norm),
             nn.Hardswish()
         )
 
         # squeeze & excite
-        if self.squeeze_and_excite:
+        if squeeze:
             self.squeeze = nn.Sequential(
                 # squeeze
                 nn.AvgPool2d(kernel_size=ro),
@@ -265,8 +300,20 @@ class IResBlock(nn.Module, ABC):
             self.identity = conv(in_channels=ci,
                                  out_channels=co,
                                  kernel_size=2 if upsample else 1,
-                                 stride=self.stride,
+                                 stride=s,
                                  padding=0)
+
+        # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+
+        # set attributes
+        self.expand = expand
+        self.upsample = upsample
+        self.downsample = downsample
+        self.co = co
+        self.squeeze_and_excite = squeeze
+        self.ci = ci
+        self.stride = s
+        self.padding = p
 
     @staticmethod
     def transpose_conv(**kwargs):
@@ -335,6 +382,31 @@ class TransposeResNetBlock(nn.Module, ABC):
             nn.Conv2d(filter_out, filter_out, kernel_size=3, stride=1,
                       padding=1, bias=False),
             nn.BatchNorm2d(filter_out))
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        r = self.residual(x)
+        i = self.identity(x)
+        x = r + i
+        x = self.relu(x)
+        return x
+
+
+class ResNetBlock(nn.Module, ABC):
+
+    def __init__(self, ci, co):
+        super().__init__()
+        self.identity = nn.Sequential(
+            Conv2d(ci=ci, co=co, k=2, s=2, p=0),
+            nn.BatchNorm2d(co)
+        )
+        self.residual = nn.Sequential(
+            Conv2d(ci=ci, co=co, k=4, s=2, p=1),
+            nn.BatchNorm2d(co),
+            nn.ReLU(),
+            Conv2d(ci=co, co=co, k=3, s=1, p=1),
+            nn.BatchNorm2d(co),
+        )
         self.relu = nn.ReLU()
 
     def forward(self, x):

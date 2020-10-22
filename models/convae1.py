@@ -35,7 +35,7 @@ class ConvAE1(nn.Module, ABC):
         )
 
         self.decoder = nn.Sequential(
-            Reshape(channels=512, resolution=2),
+            Reshape(c=512, ro=2),
             ConvBnHs(ci=512, co=256, k=2, s=2, po=0, t=True),  # 2 -> 4
             ConvBnHs(co=256, k=2, s=2, po=0, t=True),  # -> 8
             ConvBnHs(co=128, k=4, s=2, po=0, t=True),  # -> 16
