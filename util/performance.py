@@ -105,7 +105,6 @@ class _DoubleList:
         self.y_label = y_label
         self.z_label = z_label
         self.shape = shape
-        print(shape)
         # todo: allocating x,y,z (below) will result in an out of memory
         #  error on the server with var _MseSampleValid. this needs to be
         #  fixed. Maybe: save the data each epoch instead of keeping it in
