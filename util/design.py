@@ -130,7 +130,7 @@ class Design:
         s += '  dataset:\n'
         s += '    number of subsets: %s\n' % f(settings.n_subsets)
         s += '    size total: %s \n' % \
-            f(len(self._dl_train[0].dataset.dataset))
+             f(len(self._dl_train[0].dataset.dataset))
         s += '    size train: %s (%.0f%%), subset_min:%s subset_max:%s]\n' % \
              (f(sum(nt)), settings.train_pct, f(min(nt)), f(max(nt)))
         s += '    size valid: %s (%.0f%%), subset_min:%s subset_max:%s]\n' % \
@@ -274,8 +274,9 @@ class Design:
     def load(self,
              file: Union[str, Path],
              backup: Union[str, Path],
-             dl_train: DataLoader,
-             dl_val: DataLoader, log: Log):
+             dl_train: List[DataLoader],
+             dl_val: List[DataLoader],
+             log: Log):
         """
         Load Design class from <file>, also set the new number of <epochs>
         to be run and the <log> file to write to.
@@ -291,9 +292,10 @@ class Design:
 
         # load file
         try:
-            self._from_dict(torch.load(file,
-                                       map_location=torch.device('cpu')))
-        except RuntimeError:
+            self._from_dict(torch.load(
+                file, map_location=torch.device('cpu')
+            ))
+        except (RuntimeError, EOFError):
             # if failed, try loading the backup
             self._log.logprint('WARNING: loading file %s failed, trying '
                                'to load backup' % file)
@@ -373,7 +375,7 @@ class Design:
 
                 # train
                 timer.start()
-                self.train_subset(dl_t)
+                self.train_subset(dl_t, progress)
                 timer.stop('finished training')
 
                 # evaluate
@@ -389,7 +391,7 @@ class Design:
 
             # shuffle dataset, the DataLoader will only shuffle the subsets,
             #   not the train/valid dataset as a whole
-            self._dl_train[0].dataset.shuffle()
+            self._dl_train[0].dataset.dataset.shuffle()
 
             # print memory usage after each full epoch
             self._log.logprint('memory usage:\n' +
@@ -430,12 +432,12 @@ class Design:
         # move model back to cpu
         self._model = self._model.cpu()
 
-    def train_subset(self, dataloader: DataLoader):
+    def train_subset(self, dataloader: DataLoader, progress: Progress):
         """
         Train on the given training subset
         """
 
-        self.n_batches = len(dataloader)
+        n_batches = len(dataloader)
         mse = 0.0
 
         timer = Timer(self._log)
@@ -481,9 +483,14 @@ class Design:
             self._optimizer.step()
             timer_.stop('\ttook optimizer step')
 
+            # add imgs to preview buffer
+            timer_.start()
+            progress.add_imgs_to_preview_buffer(yp, yt)
+            timer_.stop('\tadded imgs to preview buffer')
+
             # calculate mse
             timer_.start()
-            mse += loss.cpu().detach().item() / self.n_batches
+            mse += loss.cpu().detach().item() / n_batches
             timer_.stop('\tcalculated mse')
 
             timer.stop('trained for 1 batch')

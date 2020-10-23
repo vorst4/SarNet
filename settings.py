@@ -16,6 +16,9 @@ if is_running_on_desktop:
     # log the timer or not
     log_timer = False
 
+    # img resolution that is used
+    img_resolution = 32
+
     # train percentage (float): percentage of the dataset that is to be used
     #   for training, the rest is used for evaluation.
     train_pct = 50  # in percent
@@ -23,7 +26,7 @@ if is_running_on_desktop:
     # batch size (int)
     batch_size = 16
 
-    # shuffle datasets or not
+    # shuffle datasets after each epoch or not
     shuffle_train = True
     shuffle_valid = True
 
@@ -34,14 +37,14 @@ if is_running_on_desktop:
     #   Thus, evaluating the dataset at multiple times during an epoch can
     #   provide more information on how the network is improving during
     #   training.
-    n_subsets = 500
+    n_subsets = 1
 
-    # path of dataset (str): the path at which the dataset csv file is located.
-    path_dataset = 'C:/Users/Dennis/Documents/dataset_sar/dataset.csv'
+    # path of dataset zip
+    path_dataset = 'dataset_sar.zip'
 
     # length of dataset (float): maximum length (in samples) of the dataset
     #   to be used, set to None to use the whole dataset
-    len_dataset = None
+    len_dataset = 1000
 
     # batch normalisation settings
     batch_norm = {'momentum': 0.99, 'eps': 1e-3}
@@ -55,7 +58,7 @@ if is_running_on_desktop:
         print_=True,
         lossplot=False,
         preview=False,
-        load_design=True,
+        load_design=False,
         save_design=True,
         path='C:/Users/Dennis/Documents/desktop_resnet_output',
         save_lossplot=True,
@@ -81,9 +84,12 @@ else:
     # batch size (int)
     batch_size = 128 * 2
 
-    # shuffle datasets or not
+    # shuffle datasets after each epoch or not
     shuffle_train = True
     shuffle_valid = True
+
+    # img resolution that is used
+    img_resolution = 32
 
     # number of train/valid subsets
     #   The evaluation set (can be) split into N unique subsets that are
@@ -95,7 +101,7 @@ else:
     n_subsets = 1000  # 10
 
     # path of dataset (str): the path at which the dataset csv file is located.
-    path_dataset = 'dataset_sar/dataset.csv'
+    path_dataset = 'dataset_sar.zip'
 
     # length of dataset (float): maximum length (in samples) of the dataset
     #   to be used, set to None to use the whole dataset

@@ -18,11 +18,11 @@ class Forward(nn.Module, ABC):
         return x
 
 
-class Conv2d(nn.Module, ABC):
+class Conv2d(nn.Conv2d, ABC):
 
     def __init__(self,
-                 ci,  # channels input
                  co,  # channels output
+                 ci=None,  # channels input
                  k=3,  # kernel size
                  s=1,  # stride
                  p=0,  # padding
@@ -31,19 +31,19 @@ class Conv2d(nn.Module, ABC):
                  bias=False,
                  mode='zeros'
                  ):
-        super().__init__()
-        self.conv2d = nn.Conv2d(in_channels=ci,
-                                out_channels=co,
-                                kernel_size=k,
-                                stride=s,
-                                padding=p,
-                                dilation=d,
-                                groups=g,
-                                bias=bias,
-                                padding_mode=mode)
+        global _last_channels_out
+        ci = _last_channels_out if ci is None else ci
+        _last_channels_out = co
 
-    def forward(self, x):
-        return self.conv2d(x)
+        super().__init__(in_channels=ci,
+                         out_channels=co,
+                         kernel_size=k,
+                         stride=s,
+                         padding=p,
+                         dilation=d,
+                         groups=groups,
+                         bias=bias,
+                         padding_mode=mode)
 
 
 class Combine(nn.Module, ABC):
@@ -54,6 +54,11 @@ class Combine(nn.Module, ABC):
     def forward(x_encoder: torch.tensor, x_meta: torch.tensor):
         return torch.cat((x_encoder.reshape(x_encoder.shape[0], -1), x_meta),
                          dim=1)
+
+
+class Upsample(nn.Upsample, ABC):
+    def __init__(self, scale_factor=2, mode='bicubic'):
+        super().__init__(scale_factor=2, mode='bicubic', align_corners=False)
 
 
 class Reshape(nn.Module, ABC):
@@ -328,6 +333,7 @@ class IResBlock(nn.Module, ABC):
         self.ci = ci
         self.stride = s
         self.padding = p
+        self.kernel_size = k
 
     @staticmethod
     def transpose_conv(**kwargs):
@@ -376,6 +382,7 @@ class IResBlock(nn.Module, ABC):
         # x = x + self.identity(i)
         # timer.stop('\t\t\tforwarded : added (changed) identity')
         # timer2.stop('\t\t\tforwarded: inverse resnet block')
+        # print(x)
         return x + self.identity(i)
 
 

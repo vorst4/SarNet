@@ -17,9 +17,6 @@ import torch.utils.data
 import torchvision.transforms
 import torchvision.transforms.functional as func
 from PIL import Image
-from zipfile import ZipFile
-from util.timer import Timer
-from util.log import Log
 
 N_ANTENNAS = 12
 
@@ -42,6 +39,15 @@ class KEY:
 
 def _list(slice_: slice) -> []:
     return list(range(*slice_.indices(slice_.stop)))
+
+
+def _load_sample(data):
+    return {
+        KEY.INPUT_IMG: [Image.open(path) for path in data[IDX.INPUT_IMG]],
+        KEY.INPUT_META: torch.tensor(data[IDX.INPUT_META]),
+        KEY.OUTPUT: Image.open(data[IDX.OUTPUT]),
+        KEY.INDEX: data[IDX.INDEX]
+    }
 
 
 class Dataset:
@@ -109,32 +115,31 @@ class Dataset:
             file = Path().cwd().joinpath(file)
 
         # read dataset.csv into a nested list
-        with ZipFile(file, 'r') as zipfile:
-            self.dataset = pandas.read_csv(
-                zipfile.open('dataset.csv'),
-                delimiter=csv_delimiter,
-                nrows=n_max,
-            ).values.tolist()
+        self.dataset = pandas.read_csv(
+            file,
+            delimiter=csv_delimiter,
+            nrows=n_max,
+        ).values.tolist()
 
-            # set dataset length
-            self.len = len(self.dataset)
+        # set dataset length
+        self.len = len(self.dataset)
 
-            # read the images from the dataset into memory and convert the
-            # meta-data to tensors (meta-data = phases & amplitudes)
-            #   Reason: image load times on server are very long (up to 40sec)
-            for idx1 in range(self.len):
-                for idx2 in (*_list(IDX.INPUT_IMG), IDX.OUTPUT):
-                    self.dataset[idx1][idx2] = Image.open(
-                        zipfile.open(self.dataset[idx1][idx2])
-                    )
-
-        # set transformation functions
-        #   Note: if no transformation is provided, ToTensor is used,
-        #   since images must always be converted to a tensor
+        # set transformation functions, images must always be converted to
+        #   tensor
         if trans_train is None:
             trans_train = ToTensor()
         if trans_val is None:
             trans_val = ToTensor()
+
+        # get directory in which dataset_file is located
+        directory = file.parents[0]
+
+        # change relative path in dataset to full path
+        for idx1 in range(self.len):
+            for idx2 in (*_list(IDX.INPUT_IMG), IDX.OUTPUT):
+                self.dataset[idx1][idx2] = str(
+                    directory.joinpath(self.dataset[idx1][idx2])
+                )
 
         # determine ids for validation/training dataset
         self.ids_train = np.arange(0, int(len(self) * self.train_pct / 100))
@@ -168,14 +173,6 @@ class Dataset:
         if self.shuffle_valid:
             np.random.shuffle(self.ids_valid)
 
-    def get(self, idx):
-        return {
-            KEY.INPUT_IMG: self.dataset[idx][IDX.INPUT_IMG],
-            KEY.INPUT_META: torch.tensor(self.dataset[idx][IDX.INPUT_META]),
-            KEY.OUTPUT: self.dataset[idx][IDX.OUTPUT],
-            KEY.INDEX: self.dataset[idx][IDX.INDEX]
-        }
-
 
 class _Subset(torch.utils.data.Dataset):
     """
@@ -185,13 +182,14 @@ class _Subset(torch.utils.data.Dataset):
     KEY = KEY
     IDX = IDX
 
-    def __init__(self, dataset, indices, transform):
-        self.dataset = dataset
+    def __init__(self, ds_obj, indices, transform):
+        self.ds_obj = ds_obj
+        self.dataset = ds_obj.dataset
         self.indices = indices
         self.transform = transform
 
     def __getitem__(self, idx):
-        return self.transform(self.dataset.get(self.indices[idx]))
+        return self.transform(_load_sample(self.dataset[self.indices[idx]]))
 
     def __len__(self):
         return len(self.indices)

@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List
 from typing import Union, TYPE_CHECKING
-
+import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
@@ -48,7 +48,8 @@ class Progress:
                      filename_postfix_preview: str = '.png',
                      preview_vstack: int = 4,
                      preview_hstack: int = 5,
-                     preview_padding: int = 1,
+                     preview_padding: int = 2,
+                     preview_padding_set: int = 16,
                      figure_size: (float, float) = (8.0, 6.0)
                      ):
             """
@@ -82,6 +83,8 @@ class Progress:
                 predicted) images stacked horizontally in the preview
             :param preview_padding: the amount of padding in pixels around
                 each image in the preview
+            :param preview_padding_set: amount of padding in pixels between
+                training and validation set.
             :param figure_size: the size of the lossplot and preview that
                 are generated
             """
@@ -103,6 +106,7 @@ class Progress:
             self.preview_vstack = preview_vstack
             self.preview_hstack = preview_hstack
             self.preview_padding = preview_padding
+            self.preview_padding_set = preview_padding_set
             self.figure_size = figure_size
 
         def __str__(self):
@@ -160,20 +164,31 @@ class Progress:
 
         # --- PREVIEW --- #
 
-        # abbreviate vars
-        vstack = self.settings.preview_vstack
-        hstack = self.settings.preview_hstack
+        # number of horizontal/vertical images per train/valid set
+        nh = 2 * self.settings.preview_hstack  # true + predicted
+        nv = self.settings.preview_vstack
 
-        # define resolution of image and of padded image
+        # padding between images, and padding between images of data/valid set
+        pad = self.settings.preview_padding
+        pad_set = self.settings.preview_padding_set
+
+        # size of 1 image in the preview buffer (resolution + padding)
+        size = img_res + 2 * pad
+
+        # define attributes
         self.res = img_res
-        self.res2 = self.res + 2 * self.settings.preview_padding
-        self.n_imgs = hstack * vstack
+        self.n_imgs = nh * nv
 
-        # pre-allocate space to speed up the script
-        self.imgs = np.zeros((self.n_imgs, 2, self.res2, self.res2))
-        # self.img_ = np.zeros((2 * hstack, vstack * self.res2, self.res2))
-        self.img_ = np.zeros((vstack * self.res2, 2 * hstack * self.res2))
-        self.img_idx = 0
+        # allocate space for image buffer
+        self.imgs_buffer = np.zeros((
+            2 * nv * size + pad_set,  # px vertical
+            nh * size  # px horizontal
+        ))
+        self.img_idx_train = 0
+        self.img_idx_valid = 0
+
+        # add white line to separate train/valid set
+        self.imgs_buffer[nv * size + pad_set // 2, :] = 1.
 
         # create plot window
         if self.settings.preview:
@@ -182,29 +197,101 @@ class Progress:
             plt.show()
 
     def add_imgs_to_preview_buffer(self, imgs_pred, imgs_true):
-        # return if buffer is full
-        if self.img_idx >= self.n_imgs:
-            return
 
-        # abbreviate padding variable
-        p = self.settings.preview_padding
+        # add it to the training-imgs or validation-imgs buffer depending on
+        #   wherever grad is enabled
+        # print(self.n_imgs)
+        # print(self.img_idx_train)
+        # print(self.img_idx_train)
+        if torch.is_grad_enabled():
+            self.img_idx_train = self._add_imgs_to_buffer(
+                buffer=self.imgs_buffer,
+                idx_buffer=self.img_idx_train,
+                imgs_pred=imgs_pred,
+                imgs_true=imgs_true,
+            )
+        else:
+            self.img_idx_valid = self._add_imgs_to_buffer(
+                buffer=self.imgs_buffer,
+                idx_buffer=self.img_idx_valid,
+                imgs_pred=imgs_pred,
+                imgs_true=imgs_true,
+            )
+
+    def _add_imgs_to_buffer(self,
+                            buffer: np.ndarray,
+                            idx_buffer: int,
+                            imgs_pred: np.ndarray,
+                            imgs_true: np.ndarray) -> int:
+
+        # return if buffer is full
+        if idx_buffer >= self.n_imgs:
+            return idx_buffer
 
         # loop through images (<batch_size> images should be given)
         for idx in range(imgs_pred.shape[0]):
 
-            # copy image into the array as a numpy matrix, also make sure it
-            #   isn't using up GPU memory
-            self.imgs[self.img_idx, 0, p:-p, p:-p] = \
-                imgs_true[idx, 0, :, :].cpu().detach().numpy()
-            self.imgs[self.img_idx, 1, p:-p, p:-p] = \
-                imgs_pred[idx, 0, :, :].cpu().detach().numpy()
+            # add true img to buffer
+            self._add_img_to_buffer(buffer,
+                                    idx_buffer,
+                                    imgs_true[idx, 0, :, :])
 
-            # update image counter
-            self.img_idx += 1
+            # update counter
+            idx_buffer += 1
+
+            # add predicted img to buffer
+            self._add_img_to_buffer(buffer,
+                                    idx_buffer,
+                                    imgs_pred[idx, 0, :, :])
+
+            # update idx buffer
+            idx_buffer += 1
 
             # return if buffer is full
-            if self.img_idx >= self.n_imgs:
-                return
+            if idx_buffer >= self.n_imgs:
+                return idx_buffer
+
+        # return current buffer idx
+        return idx_buffer
+
+    def _add_img_to_buffer(self,
+                           buffer: np.ndarray,
+                           idx: int,
+                           img: torch.tensor) -> None:
+
+        # number of horizontal/vertical images (per data/valid set)
+        nh = 2 * self.settings.preview_hstack  # true + predicted
+        nv = self.settings.preview_vstack
+
+        # padding around each img
+        pad = self.settings.preview_padding
+
+        # the size that 1 image takes up in the buffer (resolution + padding)
+        size = self.res + 2 * pad
+
+        # training images have a vertical offset since they are displayed
+        #   below the validation images
+        if torch.is_grad_enabled():
+            v_offset = nv * size + self.settings.preview_padding_set
+        else:
+            v_offset = 0
+
+        # index of image in the buffer
+        idx_h = idx % nh
+        idx_v = idx // nh
+
+        # location (in pixels) of image in buffer
+        px_h = slice(
+            idx_h * size + pad,  # horizontal pixel start
+            (idx_h + 1) * size - pad  # horizontal pixel end
+        )
+        px_v = slice(
+            idx_v * size + pad + v_offset,  # vertical pixel start
+            (idx_v + 1) * size - pad + v_offset  # vertical pixel end
+        )
+
+        # add image to buffer
+        buffer[px_v, px_h] = img.cpu().detach().numpy()
 
     def __call__(self):
 
@@ -322,35 +409,39 @@ class Progress:
     def _preview(self):
         """
         update display and/or save preview, preview being a side by side
-        comparison of (multiple) true output images
-        and predictions.
+        comparison of (multiple) true and predicted output images.
+
+        The preview is split into a top and bottom, the top are the images
+        from the validation dataset and the bottom from the training dataset.
         """
 
-        # reset buffer counter
-        self.img_idx = 0
+        # reset buffer counters
+        self.img_idx_train, self.img_idx_valid = 0, 0
 
-        # currently <imgs> is a matrix with images. The matrix has two
-        # columns with the true images on the first
-        # column and the predicted imgs on the second. Reshape this matrix
-        # to a grid pattern of side-by-side comparison
-        hstack = self.settings.preview_hstack
-        vstack = self.settings.preview_vstack
-        self.imgs = self.imgs.reshape(vstack, 2 * hstack, self.res2, self.res2)
-
-        # concatenate to create one big image
-        self.img_ = np.concatenate(self.imgs, axis=1)
-        self.img = np.concatenate(self.img_, axis=1)
-
-        # reshape imgs back to original shape
-        self.imgs = self.imgs.reshape((-1, 2, self.res2, self.res2))
+        # # currently <imgs> is a matrix with images. The matrix has two
+        # #   columns with the true images on the first
+        # #   column and the predicted imgs on the second. Reshape this matrix
+        # #   to a grid pattern of side-by-side comparison
+        # hstack = self.settings.preview_hstack
+        # vstack = self.settings.preview_vstack
+        # self.imgs = self.imgs.reshape(vstack, 2 * hstack, self.res2, self.res2)
+        #
+        # # concatenate to create one big image
+        # self.img_ = np.concatenate(self.imgs, axis=1)
+        # self.img = np.concatenate(self.img_, axis=1)
+        #
+        # # reshape imgs back to original shape
+        # self.imgs = self.imgs.reshape((-1, 2, self.res2, self.res2))
 
         # clip to [0, 1]
-        self.img = _clip(self.img, 0, 1)
+        _clip(self.imgs_buffer, 0, 1)
+        # self.img = _clip(self.img, 0, 1)
 
         # show img
         if self.settings.preview:
             plt.figure(self.IDX_PREVIEW)
-            plt.imshow(self.img, cmap='hot')
+            plt.imshow(self.imgs_buffer, cmap='hot')
+            # plt.imshow(self.img, cmap='hot')
 
         # save img
         if self.settings.save_preview:
@@ -358,10 +449,12 @@ class Progress:
                 self.settings.filename_prefix_preview +
                 '%.4f' % self.design.get_epoch_current() +
                 self.settings.filename_postfix_preview)
-            Image.fromarray((255.0 * self.img).astype(np.uint8)).save(path)
+            Image.fromarray(
+                (255.0 * self.imgs_buffer).astype(np.uint8)
+            ).save(path)
+            # Image.fromarray((255.0 * self.img).astype(np.uint8)).save(path)
 
 
 def _clip(matrix, min_, max_):
     matrix[matrix < min_] = min_
     matrix[matrix > max_] = max_
-    return matrix
