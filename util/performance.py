@@ -185,7 +185,7 @@ class _MseTrain(_List):
     def __init__(self):
         super().__init__('epochs',
                          'MSE_train',
-                         settings.epochs * settings.n_subsets)
+                         settings.epochs * settings.dataset.n_subsets)
 
     def append(self, epoch, mse_train):
         super().append(epoch, mse_train)
@@ -199,7 +199,7 @@ class _MseValid(_List):
     def __init__(self):
         super().__init__('epochs',
                          'MSE_valid',
-                         settings.epochs * settings.n_subsets)
+                         settings.epochs * settings.dataset.n_subsets)
 
     def append(self, epoch, mse_valid):
         super().append(epoch, mse_valid)

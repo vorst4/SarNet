@@ -1,6 +1,5 @@
 import argparse
 from pathlib import Path
-import numpy as np
 import torch
 import torchvision.transforms as transform
 from torch.utils.data import DataLoader
@@ -37,9 +36,9 @@ else:
 modelname = 'ResNetAE2'
 
 # set/create root path from modelname
-settings.progress_settings.path += '/' + modelname
-if not Path(settings.progress_settings.path).exists():
-    Path(settings.progress_settings.path).mkdir()
+settings.progress.path += '/' + modelname
+if not Path(settings.progress.path).exists():
+    Path(settings.progress.path).mkdir()
 
 # initialize log
 log = Log(directory=settings.directory_log,
@@ -71,16 +70,10 @@ trans_val = transform.Compose([
 
 # dataset
 timer.start()
-ds = Dataset(
-    file=settings.path_dataset,
-    train_pct=settings.train_pct,
-    n_subsets=settings.n_subsets,
-    n_max=settings.len_dataset,
-    shuffle_train=settings.shuffle_train,
-    shuffle_valid=settings.shuffle_valid,
-    # trans_train=trans_train,  # todo: re-enable transformations (+validate)
-    # trans_val=trans_val  # todo: re-enable transformations (+validate)
-)
+ds = Dataset(settings.dataset,
+             # trans_train=trans_train,  # todo: check if these are correct
+             # trans_val=trans_val  # todo: check if these are correct
+             )
 ds_train, ds_val = ds.training, ds.validation
 timer.stop('created dataset')
 
@@ -125,5 +118,5 @@ log.logprint('...done')
 # ---------------------------------- START ---------------------------------- #
 # start training
 log.logprint('--- training start --- ')
-design.train(settings.progress_settings)
+design.train(settings.progress)
 log.logprint('--- training end ---')

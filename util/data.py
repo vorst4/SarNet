@@ -8,7 +8,7 @@ since there are ~10 million samples
 """
 
 from pathlib import Path
-from typing import Union
+from typing import Union, Tuple
 
 import numpy as np
 import pandas
@@ -21,9 +21,7 @@ from zipfile import ZipFile
 from util.timer import Timer
 from util.log import Log
 
-N_ANTENNAS = 12
-
-_img_to_tensor = torchvision.transforms.ToTensor()
+N_ANTENNAS = 12  # todo: don't hardcode this
 
 
 class IDX:
@@ -79,53 +77,67 @@ class Dataset:
 
     ANGLES = tuple(torch.arange(0, 360, 30))
 
-    def __init__(self,
-                 file: Union[str, Path],
-                 train_pct: float,
-                 n_subsets: int = 1,
-                 csv_delimiter: str = ';',
-                 n_max: int = None,
-                 trans_train=None,
-                 trans_val=None,
-                 shuffle_train=True,
-                 shuffle_valid=False,
-                 ):
+    class Settings:
+        def __init__(self,
+                     file: Union[str, Path],
+                     max_samples: int = None,
+                     train_pct: float = 90,
+                     n_subsets: int = 1,
+                     shuffle_train=True,
+                     shuffle_valid=False,
+                     csv_delimiter: str = ';',
+                     ):
+            """
+            :param file: pathlib.Path or str of the dataset zip file
+            :param max_samples: maximum number of samples from dataset that
+                are to be loaded and used (convenient for debugging/testing)
+            :param train_pct: percentage of dataset to be used for training
+            :param n_subsets: running 1 epoch with the complete dataset can
+                take a very long time, meaning it takes a long time before
+                meaning-full results are obtained. The dataset can therefore
+                be split into subsets such that results are obtained every
+                < 1/n_subsets > epochs
+            :param shuffle_train: whether to shuffle the training set or
+                not, call method 'shuffle()' the shuffle the set
+            :param shuffle_valid: whether to shuffle the validation set or
+                not, call method 'shuffle()' the shuffle the set
+            :param csv_delimiter: delimiter used in csv file
+            """
+            self.file = file
+            self.max_samples = max_samples
+            self.train_pct = train_pct
+            self.n_subsets = n_subsets
+            self.shuffle_train = shuffle_train
+            self.shuffle_valid = shuffle_valid
+            self.csv_delimiter = csv_delimiter
+
+    def __init__(self, settings: Settings, trans_train=None, trans_valid=None):
         """
         Create instance of custom map-style PyTorch Dataset
-
-        :param file: <str> or <pathlib.Path> of the dataset csv file
-        :param csv_delimiter: (default: ';') delimiter used in the dataset
-        csv file
         """
 
-        # set attributes
-        self.train_pct = train_pct
-        self.n_subsets = n_subsets
-        self.shuffle_train = shuffle_train
-        self.shuffle_valid = shuffle_valid
-
         # if dir is a <str>, create a pathlib.Path from it
-        if isinstance(file, str):
-            file = Path().cwd().joinpath(file)
+        if isinstance(settings.file, str):
+            settings.file = Path().cwd().joinpath(settings.file)
 
         # read dataset.csv into a nested list
-        with ZipFile(file, 'r') as zipfile:
-            self.dataset = pandas.read_csv(
+        with ZipFile(settings.file, 'r') as zipfile:
+            dataset = pandas.read_csv(
                 zipfile.open('dataset.csv'),
-                delimiter=csv_delimiter,
-                nrows=n_max,
+                delimiter=settings.csv_delimiter,
+                nrows=settings.max_samples,
             ).values.tolist()
 
-            # set dataset length
-            self.len = len(self.dataset)
+            # number of dataset samples
+            n_samples = len(dataset)
 
             # read the images from the dataset into memory and convert the
             # meta-data to tensors (meta-data = phases & amplitudes)
             #   Reason: image load times on server are very long (up to 40sec)
-            for idx1 in range(self.len):
+            for idx1 in range(n_samples):
                 for idx2 in (*_list(IDX.INPUT_IMG), IDX.OUTPUT):
-                    self.dataset[idx1][idx2] = Image.open(
-                        zipfile.open(self.dataset[idx1][idx2])
+                    dataset[idx1][idx2] = Image.open(
+                        zipfile.open(dataset[idx1][idx2])
                     )
 
         # set transformation functions
@@ -133,28 +145,41 @@ class Dataset:
         #   since images must always be converted to a tensor
         if trans_train is None:
             trans_train = ToTensor()
-        if trans_val is None:
-            trans_val = ToTensor()
+        if trans_valid is None:
+            trans_valid = ToTensor()
 
         # determine ids for validation/training dataset
-        self.ids_train = np.arange(0, int(len(self) * self.train_pct / 100))
-        self.ids_valid = np.arange(int(len(self) * self.train_pct / 100),
-                                   len(self))
+        ids_train = np.arange(0, int(n_samples * settings.train_pct / 100))
+        ids_valid = np.arange(int(n_samples * settings.train_pct / 100),
+                              n_samples)
 
         # determine ids of training/validation subsets, and shuffle them
-        self.ids_train_subset = np.array_split(self.ids_train, self.n_subsets)
-        self.ids_valid_subset = np.array_split(self.ids_valid, self.n_subsets)
-        self.shuffle()
+        ids_train_subset = np.array_split(ids_train, settings.n_subsets)
+        ids_valid_subset = np.array_split(ids_valid, settings.n_subsets)
 
         # create validation/training datasets
-        self.training = []
-        self.validation = []
-        for ids_t, ids_v in zip(self.ids_train_subset, self.ids_valid_subset):
-            self.training.append(_Subset(self, ids_t, trans_train))
-            self.validation.append(_Subset(self, ids_v, trans_val))
+        training = []
+        validation = []
+        for ids_t, ids_v in zip(ids_train_subset, ids_valid_subset):
+            training.append(_Subset(self, ids_t, trans_train))
+            validation.append(_Subset(self, ids_v, trans_valid))
+
+        # ATTRIBUTES
+        self.settings = settings
+        self.dataset = dataset
+        self.n_samples = n_samples
+        self.ids_train = ids_train
+        self.ids_valid = ids_valid
+        self.ids_train_subset = ids_train_subset
+        self.ids_valid_subset = ids_valid_subset
+        self.training = training
+        self.validation = validation
+
+        # shuffle training/validation dataset
+        self.shuffle()
 
     def __len__(self):
-        return self.len
+        return self.n_samples
 
     def shuffle(self):
         """
@@ -163,9 +188,9 @@ class Dataset:
 
         NOTE: the training/validation dataset are still kept separate.
         """
-        if self.shuffle_train:
+        if self.settings.shuffle_train:
             np.random.shuffle(self.ids_train)
-        if self.shuffle_valid:
+        if self.settings.shuffle_valid:
             np.random.shuffle(self.ids_valid)
 
     def get(self, idx):
@@ -185,7 +210,7 @@ class _Subset(torch.utils.data.Dataset):
     KEY = KEY
     IDX = IDX
 
-    def __init__(self, dataset, indices, transform):
+    def __init__(self, dataset: Dataset, indices, transform):
         self.dataset = dataset
         self.indices = indices
         self.transform = transform
@@ -219,6 +244,7 @@ class RandomRotation:
                  expand=False,
                  center=None,
                  fill=None):
+        # todo: degrees should be defined through argument
         self.degrees = tuple(np.arange(0, 360, 30))
         self.kwargs = {
             'resample': resample,
@@ -299,12 +325,13 @@ class Normalize:
     """
 
     def __init__(self,
-                 mean_input_img=[0.5, 0.5, 0.5],
-                 std_input_img=[0.5, 0.5, 0.5],
-                 mean_input_meta=0.5,
-                 std_input_meta=0.5,
-                 mean_output=0.5,
-                 std_output=0.5):
+                 mean_input_img: Tuple[float, float, float] = (0.5, 0.5, 0.5),
+                 std_input_img: Tuple[float, float, float] = (0.5, 0.5, 0.5),
+                 mean_input_meta: float = 0.5,
+                 std_input_meta: float = 0.5,
+                 mean_output: float = 0.5,
+                 std_output: float = 0.5):
+        # ATTRIBUTES
         self.mean_input_img = mean_input_img
         self.std_input_img = std_input_img
         self.mean_input_meta = mean_input_meta

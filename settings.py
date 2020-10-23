@@ -1,12 +1,26 @@
 import os
 
 from util.progress import Progress
+from util.data import Dataset
 
 is_running_on_desktop = os.name == 'nt'  # nt: Windows , posix: Linux
 
 # -----------------------------------------------------------------------------
 # SETTINGS WINDOWS
 if is_running_on_desktop:
+
+    # dataset settings
+    dataset = Dataset.Settings(
+        file='dataset_sar.zip',
+        max_samples=None,
+        train_pct=50,
+        n_subsets=100,
+        shuffle_train=True,
+        shuffle_valid=True,
+    )
+
+    dropout_rate = 0.5
+
     # directory of log (str): the directory in which the log (.txt) is saved
     directory_log = 'output'
 
@@ -17,34 +31,12 @@ if is_running_on_desktop:
     log_timer = False
 
     # img resolution that is used
-    img_resolution = 32
-
-    # train percentage (float): percentage of the dataset that is to be used
-    #   for training, the rest is used for evaluation.
-    train_pct = 50  # in percent
+    img_resolution = 32  # todo: obtain this from dynamically from dataset
 
     # batch size (int)
-    batch_size = 16
+    batch_size = 128
 
-    # shuffle datasets after each epoch or not
-    shuffle_train = True
-    shuffle_valid = True
-
-    # number of train/valid subsets
-    #   The evaluation set (can be) split into N unique subsets that are
-    #   evaluated at equal intervals during training. Reason is that 1 epoch
-    #   takes a very long time, during which a lot of change can occur.
-    #   Thus, evaluating the dataset at multiple times during an epoch can
-    #   provide more information on how the network is improving during
-    #   training.
-    n_subsets = 1
-
-    # path of dataset zip
-    path_dataset = 'dataset_sar.zip'
-
-    # length of dataset (float): maximum length (in samples) of the dataset
-    #   to be used, set to None to use the whole dataset
-    len_dataset = 1000
+    n_antennas = 12  # todo: obtain this from dynamically from dataset
 
     # batch normalisation settings
     batch_norm = {'momentum': 0.99, 'eps': 1e-3}
@@ -54,7 +46,7 @@ if is_running_on_desktop:
     epochs = 20
 
     # progress logging settings
-    progress_settings = Progress.Settings(
+    progress = Progress.Settings(
         print_=True,
         lossplot=False,
         preview=False,
@@ -68,6 +60,19 @@ if is_running_on_desktop:
 # -----------------------------------------------------------------------------
 # SETTINGS SERVER
 else:
+
+    # dataset settings
+    dataset = Dataset.Settings(
+        file='dataset_sar.zip',
+        max_samples=None,
+        train_pct=90,
+        n_subsets=1000,
+        shuffle_train=True,
+        shuffle_valid=True,
+    )
+
+    dropout_rate = 0.5
+
     # directory of log (str): the directory in which the log (.txt) is saved
     directory_log = 'output'
 
@@ -77,35 +82,16 @@ else:
     # log the timer or not
     log_timer = True
 
-    # train percentage (float): percentage of the dataset that is to be used
-    #   for training, the rest is used for evaluation.
-    train_pct = 90  # in percent
-
     # batch size (int)
     batch_size = 128 * 2
 
-    # shuffle datasets after each epoch or not
-    shuffle_train = True
-    shuffle_valid = True
+    n_antennas = 12
 
     # img resolution that is used
     img_resolution = 32
 
-    # number of train/valid subsets
-    #   The evaluation set (can be) split into N unique subsets that are
-    #   evaluated at equal intervals during training. Reason is that 1 epoch
-    #   takes a very long time, during which a lot of change can occur.
-    #   Thus, evaluating the dataset at multiple times during an epoch can
-    #   provide more information on how the network is improving during
-    #   training.
-    n_subsets = 1000  # 10
-
     # path of dataset (str): the path at which the dataset csv file is located.
     path_dataset = 'dataset_sar.zip'
-
-    # length of dataset (float): maximum length (in samples) of the dataset
-    #   to be used, set to None to use the whole dataset
-    len_dataset = None  # 100000
 
     # batch normalisation settings
     batch_norm = {'momentum': 0.99, 'eps': 1e-3}
@@ -115,7 +101,7 @@ else:
     epochs = 20
 
     # progress logging settings
-    progress_settings = Progress.Settings(
+    progress = Progress.Settings(
         save_design=True,
         load_design=False,
         path='/home/tue/s111167/trained_models',

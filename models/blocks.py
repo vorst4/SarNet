@@ -211,8 +211,6 @@ class IResBlock(nn.Module, ABC):
 
     EXPANSION = 6
 
-    DROPOUT_RATE = 0.3
-
     def __init__(self,
                  co: int,
                  ci: int = None,
@@ -220,20 +218,27 @@ class IResBlock(nn.Module, ABC):
                  k: [3, 5, 7] = 3,
                  downsample: bool = False,
                  upsample: bool = False,
+                 upsample_mode: str = 'transpose',
                  expand=True,
                  squeeze: bool = True):
 
         # misc
         super().__init__()
         assert not (downsample & upsample), "cannot be True at the same time"
+        assert (upsample_mode == 'transpose' or upsample_mode == 'bicubic'), \
+            'upsample_mode must either be "transpose" or "bicubic"'
         global _last_channels_out, _last_resolution_out
 
         # If ci/ri not provided: use co/ro of the block that was created last
         ci = _last_channels_out if ci is None else ci
         ri = _last_resolution_out if ri is None else ri
 
+        # set transpose/bicubic
+        transpose = True if upsample_mode is 'transpose' else False
+        bicubic = True if upsample_mode is 'bicubic' else False
+
         # determine stride
-        s = 2 if downsample or upsample else 1
+        s = 2 if downsample or (upsample and transpose) else 1
 
         # determine output resolution
         if downsample:
@@ -250,8 +255,8 @@ class IResBlock(nn.Module, ABC):
         # determine padding
         p = int((k - 1) * 0.5)
 
-        # determine type of convolutional filter to use
-        conv = self.transpose_conv if upsample else nn.Conv2d
+        # determine type of convolutional filter to use during depth-wise conv
+        conv = self.transpose_conv if (upsample and transpose) else nn.Conv2d
 
         # determine number of 'depth-wise' channels
         ch_depth = self.EXPANSION if expand else 1
@@ -308,25 +313,32 @@ class IResBlock(nn.Module, ABC):
             nn.Hardswish()
         )
 
-        # dropout (to add stochastic depth)
-        self.dropout = nn.Dropout2d(self.DROPOUT_RATE)
+        # upsample (if bicubic)
+        bicubic_upsample = Upsample() if bicubic else Forward()
+
+        # dropout (adds stochastic depth)
+        self.dropout = nn.Dropout2d(settings.dropout_rate)
 
         # upsample/downsample identity, if needed
         if upsample or downsample or ci != co:
-            conv = nn.ConvTranspose2d if upsample else nn.Conv2d
-            self.identity = conv(in_channels=ci,
-                                 out_channels=co,
-                                 kernel_size=2 if upsample else 1,
-                                 stride=s,
-                                 padding=0)
+            conv = nn.ConvTranspose2d if upsample and transpose else nn.Conv2d
+            self.identity = nn.Sequential(
+                conv(in_channels=ci,
+                     out_channels=co,
+                     kernel_size=2 if upsample and transpose else 1,
+                     stride=s,
+                     padding=0),
+                Upsample() if bicubic else Forward()
+            )
         else:
             self.identity = Forward()
 
         # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
-        # set attributes
+        # ATTRIBUTES
         self.expand = expand
-        self.upsample = upsample
+        self.bicubic = bicubic
+        self.bicubic_upsample = bicubic_upsample
         self.downsample = downsample
         self.co = co
         self.squeeze_and_excite = squeeze
@@ -360,6 +372,12 @@ class IResBlock(nn.Module, ABC):
         # timer.start()
         x = self.depth_conv(x)
         # timer.stop('\t\t\tforwarded through depth-wise conv')
+
+        # bicubic upsample
+        # timer.start()
+        if self.bicubic:
+            x = self.bicubic_upsample(x)
+        # timer.stop('\t\t\tforwarded through bicubic upsample')
 
         # squeeze & excite
         if self.squeeze_and_excite:

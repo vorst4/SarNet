@@ -424,7 +424,8 @@ class Progress:
         # #   to a grid pattern of side-by-side comparison
         # hstack = self.settings.preview_hstack
         # vstack = self.settings.preview_vstack
-        # self.imgs = self.imgs.reshape(vstack, 2 * hstack, self.res2, self.res2)
+        # self.imgs = self.imgs.reshape(vstack, 2 * hstack, self.res2,
+        # self.res2)
         #
         # # concatenate to create one big image
         # self.img_ = np.concatenate(self.imgs, axis=1)
