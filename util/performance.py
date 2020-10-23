@@ -7,6 +7,12 @@ import settings
 class Performance:
 
     def __init__(self, n_validation_samples):
+
+        # do not initialize if n_valid_samples is None (convenient for hinting)
+        if n_validation_samples is None:
+            return
+
+        # ATTRIBUTES
         self.n_validation_samples = n_validation_samples
         self.mse_train = _MseTrain()
         self.mse_valid = _MseValid()

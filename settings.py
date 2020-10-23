@@ -2,6 +2,7 @@ import os
 
 from util.progress import Progress
 from util.data import Dataset
+import torch
 
 is_running_on_desktop = os.name == 'nt'  # nt: Windows , posix: Linux
 
@@ -9,11 +10,13 @@ is_running_on_desktop = os.name == 'nt'  # nt: Windows , posix: Linux
 # SETTINGS WINDOWS
 if is_running_on_desktop:
 
+    MAX_SAMPLES = 70399
+
     # dataset settings
     dataset = Dataset.Settings(
         file='dataset_sar.zip',
-        max_samples=None,
-        train_pct=50,
+        max_samples=1000,
+        train_pct=90,
         n_subsets=100,
         shuffle_train=True,
         shuffle_valid=True,
@@ -34,7 +37,7 @@ if is_running_on_desktop:
     img_resolution = 32  # todo: obtain this from dynamically from dataset
 
     # batch size (int)
-    batch_size = 128
+    batch_size = 8
 
     n_antennas = 12  # todo: obtain this from dynamically from dataset
 
@@ -80,7 +83,7 @@ else:
     save_log = True
 
     # log the timer or not
-    log_timer = True
+    log_timer = False
 
     # batch size (int)
     batch_size = 128 * 2

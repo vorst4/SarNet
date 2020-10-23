@@ -16,6 +16,10 @@ class Log:
 
     def __init__(self, directory, prefix='log_', save_log=False):
 
+        # do not initialize if directory is None (convenient for hinting)
+        if directory is None:
+            return
+
         # skip initialization if log does not have to be saved
         self.save_log = save_log
         if not save_log:

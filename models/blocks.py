@@ -219,6 +219,7 @@ class IResBlock(nn.Module, ABC):
                  downsample: bool = False,
                  upsample: bool = False,
                  upsample_mode: str = 'transpose',
+                 dropout: float = settings.dropout_rate,
                  expand=True,
                  squeeze: bool = True):
 
@@ -288,6 +289,9 @@ class IResBlock(nn.Module, ABC):
             nn.Hardswish()
         )
 
+        # upsample (if bicubic)
+        bicubic_upsample = Upsample() if bicubic else Forward()
+
         # squeeze & excite
         if squeeze:
             self.squeeze = nn.Sequential(
@@ -313,11 +317,8 @@ class IResBlock(nn.Module, ABC):
             nn.Hardswish()
         )
 
-        # upsample (if bicubic)
-        bicubic_upsample = Upsample() if bicubic else Forward()
-
         # dropout (adds stochastic depth)
-        self.dropout = nn.Dropout2d(settings.dropout_rate)
+        self.dropout = nn.Dropout2d(dropout) if dropout > 0 else None
 
         # upsample/downsample identity, if needed
         if upsample or downsample or ci != co:
@@ -392,7 +393,8 @@ class IResBlock(nn.Module, ABC):
 
         # dropout
         # timer.start()
-        x = self.dropout(x)
+        if self.dropout is not None:
+            x = self.dropout(x)
         # timer.stop('\t\t\tForwarded through dropout')
 
         # add identity to x, upsample/downsample it if required

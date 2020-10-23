@@ -216,7 +216,7 @@ def _evaluate(design):
     # gradient does not have to be calculated during evaluation
     with torch.no_grad():
         # loop over the evaluation dataset
-        for idx_batch, data in enumerate(design._dl_val):
+        for idx_batch, data in enumerate(design._dls_valid):
             # abbreviate variables and move to <device>
             yt = data['output_img'].to(device=design.device,
                                        dtype=design.dtype)

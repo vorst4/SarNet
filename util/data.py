@@ -8,7 +8,7 @@ since there are ~10 million samples
 """
 
 from pathlib import Path
-from typing import Union, Tuple
+from typing import Union, Tuple, List
 
 import numpy as np
 import pandas
@@ -20,26 +20,50 @@ from PIL import Image
 from zipfile import ZipFile
 from util.timer import Timer
 from util.log import Log
+from torch.utils.data import DataLoader
 
 N_ANTENNAS = 12  # todo: don't hardcode this
 
 
 class IDX:
     INDEX = 0
-    INPUT_IMG = slice(1, 4)  # [1, 2, 3]
+    INPUT_IMGS = slice(1, 4)  # [1, 2, 3]
     INPUT_META = slice(4, 4 + 2 * N_ANTENNAS)  # [4, 5, ..., 27, 28]
     OUTPUT = -1  # 26
 
 
 class KEY:
     INDEX = 'index'
-    INPUT_IMG = 'input_img'
+    INPUT_IMGS = 'input_img'
     INPUT_META = 'input_meta'
     OUTPUT = 'output'
 
 
 def _list(slice_: slice) -> []:
     return list(range(*slice_.indices(slice_.stop)))
+
+
+def _append_sample(dataset, idx, zipfile, index, input_imgs, input_meta,
+                   output):
+    # add sample-index
+    dataset[KEY.INDEX][idx] = int(index)
+
+    # add input img
+    for idx_img, img in enumerate(input_imgs):
+        dataset[KEY.INPUT_IMGS][idx, idx_img, :, :] = 255 * func.to_tensor(
+            Image.open(zipfile.open(img))
+        )
+
+    # add input meta
+    dataset[KEY.INPUT_META][idx, :] = torch.tensor(
+        # convert to uint8 range
+        [255 * float(a) for a in input_meta]
+    )
+
+    # add output img
+    dataset[KEY.OUTPUT][idx, :, :, :] = 255 * func.to_tensor(
+        Image.open(zipfile.open(output))
+    )
 
 
 class Dataset:
@@ -80,36 +104,56 @@ class Dataset:
     class Settings:
         def __init__(self,
                      file: Union[str, Path],
+                     img_resolution: int = 32,
                      max_samples: int = None,
                      train_pct: float = 90,
                      n_subsets: int = 1,
+                     batch_size: int = 32,
                      shuffle_train=True,
                      shuffle_valid=False,
                      csv_delimiter: str = ';',
+                     dtype=torch.float32,
                      ):
             """
             :param file: pathlib.Path or str of the dataset zip file
             :param max_samples: maximum number of samples from dataset that
-                are to be loaded and used (convenient for debugging/testing)
+                are to be loaded and used (convenient for debugging/testing).
+                If None is passed, the number of samples in the dataset are
+                counted, note however that this is pretty slow.
             :param train_pct: percentage of dataset to be used for training
             :param n_subsets: running 1 epoch with the complete dataset can
                 take a very long time, meaning it takes a long time before
                 meaning-full results are obtained. The dataset can therefore
                 be split into subsets such that results are obtained every
                 < 1/n_subsets > epochs
+            :param batch_size: batch size of each dataloader
             :param shuffle_train: whether to shuffle the training set or
                 not, call method 'shuffle()' the shuffle the set
             :param shuffle_valid: whether to shuffle the validation set or
                 not, call method 'shuffle()' the shuffle the set
             :param csv_delimiter: delimiter used in csv file
             """
+
+            # if none is given as max_samples, count the number of samples
+            #   present in the dataset. Note that this is pretty slow
+            if max_samples is None:
+                with ZipFile(file, 'r') as zipfile:
+                    with zipfile.open('dataset.csv') as file:
+                        for idx, _ in enumerate(file.readlines()):
+                            pass
+                        max_samples = idx
+
+            # ATTRIBUTES
             self.file = file
             self.max_samples = max_samples
+            self.img_resolution = img_resolution
             self.train_pct = train_pct
             self.n_subsets = n_subsets
+            self.batch_size = batch_size
             self.shuffle_train = shuffle_train
             self.shuffle_valid = shuffle_valid
             self.csv_delimiter = csv_delimiter
+            self.dtype = dtype
 
     def __init__(self, settings: Settings, trans_train=None, trans_valid=None):
         """
@@ -120,33 +164,75 @@ class Dataset:
         if isinstance(settings.file, str):
             settings.file = Path().cwd().joinpath(settings.file)
 
-        # read dataset.csv into a nested list
+        # allocate memory for dataset
+        #   using float results in ~100 GB of memory being used for the
+        #   current dataset, hence uint8 is used instead where possible.
+        dataset = {
+            KEY.INDEX: torch.empty(settings.max_samples, dtype=torch.int32),
+            KEY.INPUT_IMGS: torch.empty((settings.max_samples,
+                                         3,
+                                         settings.img_resolution,
+                                         settings.img_resolution),
+                                        dtype=torch.uint8),
+            KEY.INPUT_META: torch.empty((settings.max_samples,
+                                         2 * N_ANTENNAS),
+                                        dtype=torch.uint8),
+            KEY.OUTPUT: torch.empty((settings.max_samples,
+                                     1,
+                                     settings.img_resolution,
+                                     settings.img_resolution),
+                                    dtype=torch.uint8),
+        }
+
+        # load dataset
+        #   dataset is loaded manually, since this is faster and more memory
+        #   efficient than using pandas or any other existing function. This
+        #   is possible because the data-format is known before-hand,
+        #   which is exploited resulting in a more efficient load function.
         with ZipFile(settings.file, 'r') as zipfile:
-            dataset = pandas.read_csv(
-                zipfile.open('dataset.csv'),
-                delimiter=settings.csv_delimiter,
-                nrows=settings.max_samples,
-            ).values.tolist()
+            with zipfile.open('dataset.csv') as file:
+                # skip header
+                next(file)
 
-            # number of dataset samples
-            n_samples = len(dataset)
+                # read every line
+                for idx, byte_array in enumerate(file.readlines()):
+                    # break if max_lines is reached
+                    if idx >= settings.max_samples:
+                        break
 
-            # read the images from the dataset into memory and convert the
-            # meta-data to tensors (meta-data = phases & amplitudes)
-            #   Reason: image load times on server are very long (up to 40sec)
-            for idx1 in range(n_samples):
-                for idx2 in (*_list(IDX.INPUT_IMG), IDX.OUTPUT):
-                    dataset[idx1][idx2] = Image.open(
-                        zipfile.open(dataset[idx1][idx2])
+                    # convert bytes to string and split string at delimiter
+                    array = byte_array.decode('utf-8') \
+                        .split(settings.csv_delimiter)
+
+                    # append sample to dataset
+                    _append_sample(
+                        dataset=dataset,
+                        idx=idx,
+                        zipfile=zipfile,
+                        index=array[IDX.INDEX],
+                        input_imgs=array[IDX.INPUT_IMGS],
+                        input_meta=array[IDX.INPUT_META],
+                        output=array[IDX.OUTPUT].replace('\n', '')
                     )
+
+        # number of samples that were read
+        n_samples = idx
+
+        # reduce dataset if too much space was allocated
+        if n_samples < settings.max_samples:
+            dataset[KEY.INDEX] = dataset[KEY.INDEX][:n_samples]
+            dataset[KEY.INPUT_IMGS] = \
+                dataset[KEY.INPUT_IMGS][:n_samples, :, :, :]
+            dataset[KEY.INPUT_META] = dataset[KEY.INPUT_META][:n_samples, :]
+            dataset[KEY.OUTPUT] = dataset[KEY.OUTPUT][:n_samples, :, :]
 
         # set transformation functions
         #   Note: if no transformation is provided, ToTensor is used,
         #   since images must always be converted to a tensor
         if trans_train is None:
-            trans_train = ToTensor()
+            trans_train = Forward()
         if trans_valid is None:
-            trans_valid = ToTensor()
+            trans_valid = Forward()
 
         # determine ids for validation/training dataset
         ids_train = np.arange(0, int(n_samples * settings.train_pct / 100))
@@ -158,28 +244,34 @@ class Dataset:
         ids_valid_subset = np.array_split(ids_valid, settings.n_subsets)
 
         # create validation/training datasets
-        training = []
-        validation = []
+        dataset_train = []
+        dataset_valid = []
         for ids_t, ids_v in zip(ids_train_subset, ids_valid_subset):
-            training.append(_Subset(self, ids_t, trans_train))
-            validation.append(_Subset(self, ids_v, trans_valid))
+            dataset_train.append(_Subset(self, ids_t, trans_train))
+            dataset_valid.append(_Subset(self, ids_v, trans_valid))
+
+        # create training/validation dataloaders
+        dataloaders_train = []
+        dataloaders_valid = []
+        for ds_t, ds_v in zip(dataset_train, dataset_valid):
+            dataloaders_train.append(
+                DataLoader(ds_t, settings.batch_size)
+            )
+            dataloaders_valid.append(
+                DataLoader(ds_v, settings.batch_size)
+            )
 
         # ATTRIBUTES
         self.settings = settings
         self.dataset = dataset
-        self.n_samples = n_samples
-        self.ids_train = ids_train
-        self.ids_valid = ids_valid
-        self.ids_train_subset = ids_train_subset
-        self.ids_valid_subset = ids_valid_subset
-        self.training = training
-        self.validation = validation
+        self.dataloaders_train: List[DataLoader] = dataloaders_train
+        self.dataloaders_valid: List[DataLoader] = dataloaders_valid
+        self._n_samples = n_samples
+        self._ids_train = ids_train
+        self._ids_valid = ids_valid
 
         # shuffle training/validation dataset
         self.shuffle()
-
-    def __len__(self):
-        return self.n_samples
 
     def shuffle(self):
         """
@@ -189,17 +281,22 @@ class Dataset:
         NOTE: the training/validation dataset are still kept separate.
         """
         if self.settings.shuffle_train:
-            np.random.shuffle(self.ids_train)
+            np.random.shuffle(self._ids_train)
         if self.settings.shuffle_valid:
-            np.random.shuffle(self.ids_valid)
+            np.random.shuffle(self._ids_valid)
 
     def get(self, idx):
+        ds = self.dataset
+        dt = self.settings.dtype
         return {
-            KEY.INPUT_IMG: self.dataset[idx][IDX.INPUT_IMG],
-            KEY.INPUT_META: torch.tensor(self.dataset[idx][IDX.INPUT_META]),
-            KEY.OUTPUT: self.dataset[idx][IDX.OUTPUT],
-            KEY.INDEX: self.dataset[idx][IDX.INDEX]
+            KEY.INPUT_IMGS: ds[KEY.INPUT_IMGS][idx, :, :, :].type(dt) / 255,
+            KEY.INPUT_META: ds[KEY.INPUT_META][idx, :].type(dt) / 255,
+            KEY.OUTPUT: ds[KEY.OUTPUT][idx, :, :].type(dt) / 255,
+            KEY.INDEX: ds[KEY.INDEX][idx]
         }
+
+    def __len__(self):
+        return self._n_samples
 
 
 class _Subset(torch.utils.data.Dataset):
@@ -222,14 +319,19 @@ class _Subset(torch.utils.data.Dataset):
         return len(self.indices)
 
 
+class Forward:
+    def __call__(self, x):
+        return x
+
+
 class ToTensor:
     def __init__(self):
         pass
 
     def __call__(self, sample):
-        for idx, img in enumerate(sample[KEY.INPUT_IMG]):
-            sample[KEY.INPUT_IMG][idx] = func.to_tensor(img)
-        sample[KEY.INPUT_IMG] = torch.cat(sample[KEY.INPUT_IMG], dim=0)
+        for idx, img in enumerate(sample[KEY.INPUT_IMGS]):
+            sample[KEY.INPUT_IMGS][idx] = func.to_tensor(img)
+        sample[KEY.INPUT_IMGS] = torch.cat(sample[KEY.INPUT_IMGS], dim=0)
         sample[KEY.OUTPUT] = func.to_tensor(sample[KEY.OUTPUT])
         return sample
 
@@ -262,8 +364,8 @@ class RandomRotation:
         rand_degree = self.degrees[idx]
 
         # input images
-        for idx, img in enumerate(sample[KEY.INPUT_IMG]):
-            sample[KEY.INPUT_IMG][idx] = func.rotate(
+        for idx, img in enumerate(sample[KEY.INPUT_IMGS]):
+            sample[KEY.INPUT_IMGS][idx] = func.rotate(
                 img, self.degrees[idx], **self.kwargs
             )
 
@@ -292,8 +394,8 @@ class RandomVerticalFlip:
 
         # else, flip sample and return it
         #   flip input images
-        for idx, img in enumerate(sample[KEY.INPUT_IMG]):
-            sample[KEY.INPUT_IMG][idx] = func.vflip(img)
+        for idx, img in enumerate(sample[KEY.INPUT_IMGS]):
+            sample[KEY.INPUT_IMGS][idx] = func.vflip(img)
 
         #   flip input meta-data
         # todo: do this dynamically in a more elegant way
@@ -340,7 +442,7 @@ class Normalize:
         self.std_output = std_output
 
     def __call__(self, sample):
-        func.normalize(tensor=sample[KEY.INPUT_IMG],
+        func.normalize(tensor=sample[KEY.INPUT_IMGS],
                        mean=self.mean_input_img,
                        std=self.std_input_img,
                        inplace=True)

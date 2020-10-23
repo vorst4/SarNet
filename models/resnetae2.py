@@ -13,6 +13,7 @@ class ResNetAE2(nn.Module, ABC):
         c = 512  # channels
         ri = settings.img_resolution  # resolution input
         ni_meta = 24  # number of meta-data input variables
+        d = settings.dropout_rate
 
         self.encoder = nn.Sequential(
             blk.IResBlock(ci=3, co=c // 32, ri=ri, k=3, downsample=True,
@@ -23,7 +24,7 @@ class ResNetAE2(nn.Module, ABC):
                           expand=False, squeeze=False),
             blk.IResBlock(co=c // 4, k=3, downsample=True,
                           expand=False, squeeze=False),
-            blk.IResBlock(co=c//2, k=3, downsample=True,
+            blk.IResBlock(co=c // 2, k=3, downsample=True,
                           expand=False, squeeze=False),
             blk.IResBlock(co=c, k=3, downsample=True,
                           expand=False, squeeze=False),
@@ -37,24 +38,29 @@ class ResNetAE2(nn.Module, ABC):
             blk.Reshape(co=c, ro=1),
             blk.IResBlock(co=c, k=2,
                           upsample=True,
+                          dropout=d * (1 - 0.2 * 4),
                           expand=False,
                           squeeze=False),
             blk.IResBlock(co=c // 2, k=2,
                           upsample=True,
+                          dropout=d * (1 - 0.2 * 3),
                           expand=False,
                           squeeze=False),
             blk.IResBlock(co=c // 4, k=2,
                           upsample=True,
+                          dropout=d * (1 - 0.2 * 2),
                           expand=False,
                           squeeze=False),
             blk.IResBlock(co=c // 8, k=3,
                           upsample=True,
                           upsample_mode='bicubic',
+                          dropout=d * (1 - 0.2 * 1),
                           expand=False,
                           squeeze=False),
             blk.IResBlock(co=c // 16, k=3,
                           upsample=True,
                           upsample_mode='bicubic',
+                          dropout=d * (1 - 0.2 * 0),
                           expand=False,
                           squeeze=False),
             blk.Conv2d(co=1, k=3, p=1, bias=True),

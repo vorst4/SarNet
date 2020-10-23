@@ -5,7 +5,7 @@ from pathlib import Path
 from util.timer import Timer
 from typing import Union, List, Tuple
 
-import numpy as np
+
 import torch
 import torch.nn as nn
 import torch.optim
@@ -61,18 +61,18 @@ class Design:
 
     def __init__(self):
         self.n_phase = 360
-        self._dl_train: List[_Subset] = None
-        self._dl_val = None
-        self._model = None
+        self._dls_train: List[_Subset] = []
+        self._dls_valid: List[_Subset] = []
+        self._model = nn.Module()
         self._loss_function = None
         self._optimizer = None
         self._lr_sched = None
-        self._log: Log = None
-        self._epoch_start = None
-        self.epoch_current = None
-        self._epoch_stop = None
-        self._timer = None
-        self.performance: Performance = None
+        self._log = Log(None)
+        self._epoch_start = -1
+        self.epoch_current = -1.
+        self._epoch_stop = -1
+        self._timer = Timer(None)
+        self.performance = Performance(None)
         self._mse_per_sample = MsePerSample(None)
         torch.manual_seed(self._torch_seed)
 
@@ -85,8 +85,8 @@ class Design:
                lr_scheduler: torch.optim.lr_scheduler,
                epochs: int,
                log: Log):
-        self._dl_train = dataloader_training
-        self._dl_val = dataloader_validation
+        self._dls_train = dataloader_training
+        self._dls_valid = dataloader_validation
         self._model = model
         self._loss_function = loss_function
         self._optimizer = optimizer
@@ -99,7 +99,7 @@ class Design:
         # performance parameters
         #   get total number of validation samples
         n_validation_samples = 0
-        for dl in self._dl_val:
+        for dl in self._dls_valid:
             n_validation_samples += len(dl.dataset)
         #   create performance object
         self.performance = Performance(n_validation_samples)
@@ -113,7 +113,7 @@ class Design:
         # todo: show number of cpu cores, clock frequency, and cpu usage
         # number of training and validation samples per subset:
         nt, nv = [], []
-        for dlt, dlv in zip(self._dl_train, self._dl_val):
+        for dlt, dlv in zip(self._dls_train, self._dls_valid):
             nt.append(len(dlt.dataset))
             nv.append(len(dlv.dataset))
 
@@ -131,12 +131,13 @@ class Design:
         s += '  dataset:\n'
         s += '    number of subsets: %s\n' % f(settings.dataset.n_subsets)
         s += '    size total: %s \n' % \
-             f(len(self._dl_train[0].dataset.dataset))
+             f(len(self._dls_train[0].dataset.dataset))
         s += '    size train: %s (%.0f%%), subset_min:%s subset_max:%s]\n' % \
              (f(sum(nt)), train_pct, f(min(nt)), f(max(nt)))
         s += '    size valid: %s (%.0f%%), subset_min:%s subset_max:%s]\n' % \
              (f(sum(nv)), 100 - train_pct, f(min(nt)),
               f(max(nt)))
+        s += '  batch size: %i\n' % settings.batch_size
         s += '  number of model parameters: %s\n' % f(n_par)
         s += '  memory usage\n' + self._log.memory_usage(' ' * 4)
         return s
@@ -313,8 +314,8 @@ class Design:
 
         # set non serializable attributes
         self._log = log
-        self._dl_train = dl_train
-        self._dl_val = dl_val
+        self._dls_train = dl_train
+        self._dls_valid = dl_val
 
         return self
 
@@ -329,7 +330,7 @@ class Design:
         self._timer = timer
 
         # get the resolution of the output images (assuming they are square)
-        sample = self._dl_train[0].dataset.__getitem__(0)
+        sample = self._dls_train[0].dataset.__getitem__(0)
         img_res = sample[Dataset.KEY.OUTPUT].shape[1]
         del sample
 
@@ -345,8 +346,8 @@ class Design:
             if progress.path_design.exists():
                 self.load(progress.path_design,
                           progress.path_design_backup[0],
-                          self._dl_train,
-                          self._dl_val,
+                          self._dls_train,
+                          self._dls_valid,
                           self._log)
             timer.stop('loaded design')
 
@@ -369,10 +370,10 @@ class Design:
         for epoch in range(int(self._epoch_start), self._epoch_stop):
 
             # loop over training and validation subsets
-            for idx, (dl_t, dl_v) in enumerate(zip(self._dl_train,
-                                                   self._dl_val)):
+            for idx, (dl_t, dl_v) in enumerate(zip(self._dls_train,
+                                                   self._dls_valid)):
                 # continue till current epoch is reached
-                if (epoch + idx / len(self._dl_train)) < self.epoch_current:
+                if (epoch + idx / len(self._dls_train)) < self.epoch_current:
                     continue
 
                 # train
@@ -387,13 +388,13 @@ class Design:
 
                 # save progress
                 timer.start()
-                self.epoch_current = epoch + (idx + 1) / len(self._dl_train)
+                self.epoch_current = epoch + (idx + 1) / len(self._dls_train)
                 progress()
                 timer.stop('saved progress')
 
             # shuffle dataset, the DataLoader will only shuffle the subsets,
             #   not the train/valid dataset as a whole
-            self._dl_train[0].dataset.dataset.shuffle()
+            self._dls_train[0].dataset.dataset.shuffle()
 
             # print memory usage after each full epoch
             self._log.logprint('memory usage:\n' +
@@ -462,7 +463,7 @@ class Design:
             timer_.start()
             kwargs = {'device': self.device, 'dtype': self.dtype}
             yt = data[Dataset.KEY.OUTPUT].to(**kwargs)
-            x_img = data[Dataset.KEY.INPUT_IMG].to(**kwargs)
+            x_img = data[Dataset.KEY.INPUT_IMGS].to(**kwargs)
             x_meta = data[Dataset.KEY.INPUT_META].to(**kwargs)
             timer_.stop('\tabbreviated variables and moved them to device')
 
@@ -533,7 +534,7 @@ class Design:
                 # abbreviate variables and move to <device>
                 kwargs = {'device': self.device, 'dtype': self.dtype}
                 yt = data[Dataset.KEY.OUTPUT].to(**kwargs)
-                x_img = data[Dataset.KEY.INPUT_IMG].to(**kwargs)
+                x_img = data[Dataset.KEY.INPUT_IMGS].to(**kwargs)
                 x_meta = data[Dataset.KEY.INPUT_META].to(**kwargs)
                 timer_.stop('abbreviated variables and moved to device')
 

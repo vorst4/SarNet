@@ -68,27 +68,14 @@ trans_val = transform.Compose([
     Normalize(),
 ])
 
-# dataset
+# create dataset and obtain DataLoader objects for train/valid set
 timer.start()
 ds = Dataset(settings.dataset,
              # trans_train=trans_train,  # todo: check if these are correct
              # trans_val=trans_val  # todo: check if these are correct
              )
-ds_train, ds_val = ds.training, ds.validation
+dls_train, dls_valid = ds.dataloaders_train, ds.dataloaders_valid
 timer.stop('created dataset')
-
-# create dataloader for both sets
-timer.start()
-dl_train = []
-dl_val = []
-for ds_t, ds_v in zip(ds_train, ds_val):
-    dl_train.append(
-        DataLoader(ds_t, settings.batch_size)
-    )
-    dl_val.append(
-        DataLoader(ds_v, settings.batch_size)
-    )
-timer.stop('created dataloaders')
 
 # log memory usage
 log.logprint('...done, memory usage (cpu): ' + log.cpu_memory_usage())
@@ -110,7 +97,7 @@ log.logprint('...done')
 log.logprint('creating design...')
 timer.start()
 design = Design().create(
-    dl_train, dl_val, model, lf, optimizer, None, settings.epochs, log
+    dls_train, dls_valid, model, lf, optimizer, None, settings.epochs, log
 )
 timer.stop('created design')
 log.logprint('...done')
