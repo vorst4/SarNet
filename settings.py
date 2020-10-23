@@ -67,7 +67,7 @@ else:
     # dataset settings
     dataset = Dataset.Settings(
         file='dataset_sar.zip',
-        max_samples=None,
+        max_samples=10236800,
         train_pct=90,
         n_subsets=1000,
         shuffle_train=True,
