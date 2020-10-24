@@ -167,6 +167,14 @@ class Dataset:
         # allocate memory for dataset
         #   using float results in ~100 GB of memory being used for the
         #   current dataset, hence uint8 is used instead where possible.
+        #   This reduces the memory cost to only <...> GB for the complete
+        #   dataset. Furthermore, pre-allocating the data results in much
+        #   faster load times.  Pandas took 3h 45min to load the whole
+        #   dataset, this function only takes <...>.
+        #
+        #   Note: the dataset is a zip file, this is because reading from 1
+        #   zip container is faster than reading millions of separate image
+        #   files.
         dataset = {
             KEY.INDEX: torch.empty(settings.max_samples, dtype=torch.int32),
             KEY.INPUT_IMGS: torch.empty((settings.max_samples,
@@ -185,10 +193,6 @@ class Dataset:
         }
 
         # load dataset
-        #   dataset is loaded manually, since this is faster and more memory
-        #   efficient than using pandas or any other existing function. This
-        #   is possible because the data-format is known before-hand,
-        #   which is exploited resulting in a more efficient load function.
         with ZipFile(settings.file, 'r') as zipfile:
             with zipfile.open('dataset.csv') as file:
                 # skip header

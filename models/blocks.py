@@ -7,8 +7,8 @@ import settings
 from util.timer import Timer
 from util.log import Log
 
-_last_channels_out = None
-_last_resolution_out = None
+_last_channels_out = 3  # permittivity, conductivity, density
+_last_resolution_out = settings.img_resolution
 
 
 class Forward(nn.Module, ABC):

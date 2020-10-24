@@ -15,7 +15,7 @@ if is_running_on_desktop:
     # dataset settings
     dataset = Dataset.Settings(
         file='dataset_sar.zip',
-        max_samples=1000,
+        max_samples=MAX_SAMPLES,
         train_pct=90,
         n_subsets=100,
         shuffle_train=True,
