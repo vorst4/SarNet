@@ -22,7 +22,7 @@ if is_running_on_desktop:
         shuffle_valid=True,
     )
 
-    dropout_rate = 0.5
+    dropout_rate = 0.4
 
     # directory of log (str): the directory in which the log (.txt) is saved
     directory_log = 'output'
@@ -46,7 +46,7 @@ if is_running_on_desktop:
 
     # settings learning-rate tuner
     beta1s = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.999]
-    epochs = 20
+    epochs = 10
 
     # progress logging settings
     progress = Progress.Settings(
@@ -74,7 +74,7 @@ else:
         shuffle_valid=True,
     )
 
-    dropout_rate = 0.5
+    dropout_rate = 0.4
 
     # directory of log (str): the directory in which the log (.txt) is saved
     directory_log = 'output'
@@ -101,7 +101,7 @@ else:
 
     # settings learning-rate tuner
     # beta1s = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.999]
-    epochs = 20
+    epochs = 10
 
     # progress logging settings
     progress = Progress.Settings(
