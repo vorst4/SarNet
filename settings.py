@@ -22,7 +22,7 @@ if is_running_on_desktop:
         shuffle_valid=True,
     )
 
-    dropout_rate = 0.4
+    dropout_rate = 0.0
 
     # directory of log (str): the directory in which the log (.txt) is saved
     directory_log = 'output'
