@@ -2,7 +2,7 @@ from abc import ABC
 
 import torch.nn as nn
 
-from .blocks import Reshape, IResBlock, Combine, LinBnHs, \
+from .blocks import Reshape, InvResBlock, Combine, LinBnHs, \
     InverseResidualEncoder
 from util.timer import Timer
 from util.log import Log
@@ -52,11 +52,11 @@ class ResNetAE1(nn.Module, ABC):
 
         self.decoder = nn.Sequential(
             Reshape(c=512, ro=2),
-            IResBlock(ci=512, co=128, ri=2, k=2, expand=False, upsample=True),
-            IResBlock(ci=128, co=64, ri=4, k=2, upsample=True),
-            IResBlock(ci=64, co=32, ri=8, k=4, upsample=True),
-            IResBlock(ci=32, co=16, ri=16, k=3, upsample=True),
-            IResBlock(ci=16, co=8, ri=32, k=3, expand=False, upsample=True),
+            InvResBlock(ci=512, co=128, ri=2, k=2, expand=False, upsample=True),
+            InvResBlock(ci=128, co=64, ri=4, k=2, upsample=True),
+            InvResBlock(ci=64, co=32, ri=8, k=4, upsample=True),
+            InvResBlock(ci=32, co=16, ri=16, k=3, upsample=True),
+            InvResBlock(ci=16, co=8, ri=32, k=3, expand=False, upsample=True),
             nn.Conv2d(8, 1, 3, padding=1)
         )
 

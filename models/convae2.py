@@ -2,7 +2,7 @@ from abc import ABC
 
 import torch.nn as nn
 
-from .blocks import ConvBnHs, Combine, LinBnHs, IResBlock, Reshape, \
+from .blocks import ConvBnHs, Combine, LinBnHs, InvResBlock, Reshape, \
     InverseResidualEncoder
 from util.timer import Timer
 from util.log import Log

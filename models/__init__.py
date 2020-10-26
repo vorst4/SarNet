@@ -8,3 +8,4 @@ from .denseae1 import DenseAE1
 from .resnetae1 import ResNetAE1
 from .resnetae2 import ResNetAE2
 from .convunet import ConvUNet
+from .resunet import ResUNet

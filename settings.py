@@ -17,7 +17,8 @@ if RUNNING_ON_DESKTOP:
 
     # dataset settings
     dataset = Dataset.Settings(
-        file='dataset_sar.zip',
+        # file='dataset_sar.zip',
+        file='dataset_msf.zip',
         max_samples=MAX_SAMPLES,
         train_pct=90,
         n_subsets=100,
@@ -65,10 +66,11 @@ else:
 
     # dataset
     dataset = Dataset.Settings(
-        file='dataset_sar.zip',
+        # file='dataset_sar.zip',
+        file='dataset_msf.zip',
         max_samples=MAX_SAMPLES // 100,
         train_pct=90,
-        n_subsets=1000,
+        n_subsets=1000 // 10,
         shuffle_train=True,
         shuffle_valid=True,
     )
@@ -87,9 +89,6 @@ else:
     # batch size (int)
     batch_size = 128
 
-    # path of dataset (str): the path at which the dataset csv file is located.
-    path_dataset = 'dataset_sar.zip'
-
     # batch normalisation settings
     batch_norm = {'momentum': 0.99, 'eps': 1e-3}
 
@@ -101,7 +100,8 @@ else:
     progress = Progress.Settings(
         save_design=True,
         load_design=False,
-        path='/home/tue/s111167/trained_models',
+        # path='/home/tue/s111167/trained_models',
+        path='/home/tue/s111167/trained_models_msf',
         save_lossplot=True,
         save_preview=True,
     )

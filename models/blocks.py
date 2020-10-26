@@ -187,7 +187,7 @@ class ConvBnHs(nn.Module, ABC):
 #         return x
 
 
-class IResBlock(nn.Module, ABC):
+class InvResBlock(nn.Module, ABC):
     """
     Inverse Resnet Block from MobileNet v3, it is an inverted residual block
     with linear bottleneck + squeeze & excitation.
@@ -464,13 +464,13 @@ class InverseResidualEncoder(nn.Module, ABC):
         super().__init__()
         self.encoder = nn.Sequential(
             # Use just a convolutional layer for the first layer
-            IResBlock(ci=3, co=32, ri=64, k=3, expand=False, squeeze=False),
-            IResBlock(ci=32, co=64, ri=64, k=3, expand=False, downsample=True),
-            IResBlock(ci=64, co=96, ri=32, k=5, downsample=True),
-            IResBlock(ci=96, co=128, ri=16, k=3, downsample=True),
-            IResBlock(ci=128, co=256, ri=8, k=5, downsample=True),
-            IResBlock(ci=256, co=512, ri=4, k=3, downsample=True),
-            IResBlock(ci=512, co=1024, ri=2, k=3, downsample=True),
+            InvResBlock(ci=3, co=32, ri=64, k=3, expand=False, squeeze=False),
+            InvResBlock(ci=32, co=64, ri=64, k=3, expand=False, downsample=True),
+            InvResBlock(ci=64, co=96, ri=32, k=5, downsample=True),
+            InvResBlock(ci=96, co=128, ri=16, k=3, downsample=True),
+            InvResBlock(ci=128, co=256, ri=8, k=5, downsample=True),
+            InvResBlock(ci=256, co=512, ri=4, k=3, downsample=True),
+            InvResBlock(ci=512, co=1024, ri=2, k=3, downsample=True),
         )
 
     def forward(self, x):
