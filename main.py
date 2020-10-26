@@ -43,6 +43,8 @@ if not Path(settings.progress.path).exists():
     Path(settings.progress.path).mkdir()
 
 # initialize log
+settings.log.filename_prefix += modelname + '_'
+print(settings.log.filename_prefix)
 log = Log(settings.log)
 
 # print memory usage

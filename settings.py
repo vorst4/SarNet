@@ -33,14 +33,13 @@ if RUNNING_ON_DESKTOP:
     dropout_rate = 0.2
 
     # log the timer or not
-    log_timer = True
+    log_timer = False
 
     # batch size (int)
     batch_size = 8
 
     # batch normalisation settings
     batch_norm = {'momentum': 0.99, 'eps': 1e-3}
-    batch_norm = {}
 
     # settings learning-rate tuner
     # beta1s = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.999]
@@ -67,7 +66,7 @@ else:
     # dataset
     dataset = Dataset.Settings(
         file='dataset_sar.zip',
-        max_samples=MAX_SAMPLES // 10,
+        max_samples=MAX_SAMPLES // 100,
         train_pct=90,
         n_subsets=1000,
         shuffle_train=True,
