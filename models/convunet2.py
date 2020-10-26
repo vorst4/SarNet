@@ -2,6 +2,9 @@ from abc import ABC
 
 import torch
 import torch.nn as nn
+
+from util.timer import Timer
+from util.log import Log
 import models.blocks as blk
 import settings
 
@@ -51,23 +54,22 @@ class Upsample(nn.Module, ABC):
 
 
 class Stage(nn.Module, ABC):
-    def __init__(self, ci, co, ro):
+    def __init__(self, ci, co, dr):
         super().__init__()
-        self.down = nn.Conv2d(in_channels=ci,
-                              out_channels=ci,
-                              kernel_size=2,
-                              stride=2,
-                              bias=False)
-        self.res = blk.InvResBlock(ci=ci, co=co, ri=ro)
+        self.down = ConvBlock(ci=ci, co=ci, k=2, s=2, p=0)
+        self.conv1 = ConvBlock(ci=ci, co=co, k=3, s=1, p=1)
+        self.conv2 = ConvBlock(ci=co, co=co, k=3, s=1, p=1)
+        self.drp = nn.Dropout2d(p=dr)
 
     def forward(self, x):
-        return self.res(self.down(x))
+        return self.drp(self.conv2(self.conv1(self.down(x))))
 
 
-class TStage(nn.Module, ABC):
-    def __init__(self, ci, co, mode, ri):
+class InvStage(nn.Module, ABC):
+    def __init__(self, ci, co, mode, dr):
         super().__init__()
-        self.res = blk.InvResBlock(ci=2*ci, co=co, ri=ri)
+        self.conv1 = ConvBlock(ci=ci, co=ci, k=3, s=1, p=1)
+        self.conv2 = ConvBlock(ci=ci, co=ci, k=3, s=1, p=1)
         if mode == 'transpose':
             self.up = InvConvBlock(ci=ci, co=co, k=2, s=2, p=0)
         elif mode == 'bicubic':
@@ -77,12 +79,13 @@ class TStage(nn.Module, ABC):
                 ConvBlock(ci=ci, co=co, k=1, s=1, p=0))
         else:
             raise ValueError('mode should either be transpose or bicubic')
+        self.drp = nn.Dropout2d(p=dr)
 
     def forward(self, x1, x2):
-        return self.up(self.res(torch.cat((x1, x2), dim=1)))
+        return self.drp(self.up(self.conv2(self.conv1(x1))))
 
 
-class ResUNet(nn.Module, ABC):
+class ConvUNet2(nn.Module, ABC):
     """
     Convolutional Auto-encoder 1
         bottleneck: 1 dense connected layer, batch norm and relu
@@ -97,22 +100,26 @@ class ResUNet(nn.Module, ABC):
         channels = 1024
         dr = settings.dropout_rate
 
-        self.enc1 = blk.InvResBlock(ci=3, co=64, ri=32,
-                                    expand=False, squeeze=False)
-        self.enc2 = Stage(ci=64, co=128, ro=16)
-        self.enc3 = Stage(ci=128, co=256, ro=8)
-        self.enc4 = Stage(ci=256, co=512, ro=4)
+        self.enc1 = nn.Sequential(
+            ConvBlock(ci=3, co=64, k=3, s=1, p=1),
+            ConvBlock(ci=64, co=64, k=3, s=1, p=1),
+            nn.Dropout2d(p=dr)
+        )
+        self.enc2 = Stage(64, 128, dr=dr)  # 32 -> 16
+        self.enc3 = Stage(128, 256, dr=dr)  # 16 -> 8
+        self.enc4 = Stage(256, 512, dr=dr)  # 8 -> 4
         self.enc5 = ConvBlock(ci=512, co=4096 - 24, k=4, s=1, p=0)  # 4 -> 1
 
         self.bn1 = blk.Combine()
         self.bn2 = blk.Reshape(co=4096, ro=1)
         self.bn3 = InvConvBlock(ci=4096, co=512, k=4, s=1, p=0)  # 1 -> 4
 
-        self.dec1 = TStage(ci=512, co=256, mode='transpose', ri=4)
-        self.dec2 = TStage(ci=256, co=128, mode='transpose', ri=8)
-        self.dec3 = TStage(ci=128, co=64, mode='transpose', ri=16)
+        self.dec1 = InvStage(ci=512, co=256, mode='transpose', dr=dr)
+        self.dec2 = InvStage(ci=256, co=128, mode='transpose', dr=dr)
+        self.dec3 = InvStage(ci=128, co=64, mode='transpose', dr=dr)
         self.dec4 = nn.Sequential(
-            blk.InvResBlock(ci=128, co=64, ri=32),
+            ConvBlock(ci=64, co=64, k=3, s=1, p=1),
+            ConvBlock(ci=64, co=64, k=3, s=1, p=1),
             ConvBlock(ci=64, co=1, k=1, s=1, p=0),
         )
 
@@ -130,6 +137,6 @@ class ResUNet(nn.Module, ABC):
         x = self.dec1(x, x4)
         x = self.dec2(x, x3)
         x = self.dec3(x, x2)
-        x = self.dec4(torch.cat((x, x1), dim=1))
+        x = self.dec4(x)
 
         return x

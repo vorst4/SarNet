@@ -35,7 +35,8 @@ else:
 # modelname = ['ResNetAE1', 'ConvAE1', 'DenseAE1'][job_id]
 # modelname = 'ResNetAE2'
 # modelname = 'ConvAE2'
-modelname = 'ConvUNet'
+# modelname = 'ConvUNet'
+modelname = 'ConvUNet2'
 # modelname = 'ResUNet'
 
 # set/create root path from modelname
