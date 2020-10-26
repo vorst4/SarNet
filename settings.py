@@ -10,9 +10,6 @@ IMG_RESOLUTION = 32  # todo: obtain this from dynamically from dataset
 N_ANTENNAS = 12  # todo: obtain this from dynamically from dataset
 
 # -----------------------------------------------------------------------------
-# GENERAL SETTINGS
-
-# -----------------------------------------------------------------------------
 # SETTINGS WINDOWS
 if RUNNING_ON_DESKTOP:
 
@@ -33,7 +30,7 @@ if RUNNING_ON_DESKTOP:
         save_log=False,
     )
 
-    dropout_rate = 0.0
+    dropout_rate = 0.2
 
     # log the timer or not
     log_timer = True
@@ -83,13 +80,13 @@ else:
         save_log=True,
     )
 
-    dropout_rate = 0.4
+    dropout_rate = 0.2
 
     # log the timer or not
     log_timer = False
 
     # batch size (int)
-    batch_size = 128 * 2
+    batch_size = 128
 
     # path of dataset (str): the path at which the dataset csv file is located.
     path_dataset = 'dataset_sar.zip'

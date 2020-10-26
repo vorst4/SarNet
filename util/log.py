@@ -28,7 +28,7 @@ class Log:
         # use default settings if None is given
         settings = self.Settings(None) if settings is None else settings
 
-        # ATTRIBUTES
+        # ATTRIBUTE
         self.settings = settings
 
         # skip initialization if log does not have to be saved
@@ -53,16 +53,16 @@ class Log:
         if log.exists():
             raise Exception('ERROR: log-file already exists')
 
+        # ATTRIBUTE
+        self.log = log
+
         # create file
-        self.__call__('log created')
+        self('log created')
 
         # sanity check that it now exists
         if not self.log.exists():
             raise Exception('ERROR: could not create log file, '
                             'check permissions')
-
-        # ATTRIBUTES
-        self.log = log
 
     @staticmethod
     def _timestamp():
