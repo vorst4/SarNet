@@ -14,40 +14,55 @@ class Log:
     logfile.
     """
 
-    def __init__(self, directory, prefix='log_', save_log=False):
+    class Settings:
+        def __init__(self,
+                     directory: [Path, str, None],
+                     save_log: bool = False,
+                     filename_prefix: str = 'log_'):
+            self.directory = directory
+            self.save_log = save_log
+            self.filename_prefix = filename_prefix
 
-        # do not initialize if directory is None (convenient for hinting)
-        if directory is None:
-            return
+    def __init__(self, settings: [Settings, None]):
+
+        # use default settings if None is given
+        settings = self.Settings(None) if settings is None else settings
+
+        # ATTRIBUTES
+        self.settings = settings
 
         # skip initialization if log does not have to be saved
-        self.save_log = save_log
-        if not save_log:
+        if not settings.save_log:
             return
 
         # get current date and time as string
         time_str = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
         # define log path
-        if isinstance(directory, str):
-            directory = Path(directory)
-        self.log = directory.joinpath(prefix + time_str + '.txt')
+        if isinstance(settings.directory, str):
+            settings.directory = Path(settings.directory)
+        log = settings.directory.joinpath(
+            settings.filename_prefix + time_str + '.txt'
+        )
 
         # create log dir if it does not exist yet
-        if not directory.exists():
-            directory.mkdir()
+        if not settings.directory.exists():
+            settings.directory.mkdir()
 
         # sanity check that log file does not exist yet
-        if self.log.exists():
+        if log.exists():
             raise Exception('ERROR: log-file already exists')
 
         # create file
-        self.logprint('log created')
+        self.__call__('log created')
 
         # sanity check that it now exists
         if not self.log.exists():
             raise Exception('ERROR: could not create log file, '
                             'check permissions')
+
+        # ATTRIBUTES
+        self.log = log
 
     @staticmethod
     def _timestamp():
@@ -57,13 +72,13 @@ class Log:
     def _indent():
         return ' ' * 23 + ' |   '
 
-    def logprint(self, msg):
+    def __call__(self, msg):
 
         # print msg to console
         print(msg)
 
         # return if log does not to be saved
-        if not self.save_log:
+        if not self.settings.save_log:
             return
 
         # open log

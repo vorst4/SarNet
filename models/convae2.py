@@ -21,63 +21,74 @@ class ConvAE2(nn.Module, ABC):
         super().__init__()
 
         channels = 1024
+        self.encoder = []
+        self.decoder = []
 
         # layers
-        self.encoder = nn.Sequential(
-            # block 1 (64x64) -> (32x32)
+
+        # block 1 (32x32) -> (16x16)
+        self.encoder.append(nn.Sequential(
             nn.Conv2d(in_channels=3,
                       out_channels=32,
-                      kernel_size=3,
+                      kernel_size=5,
                       stride=2,
-                      padding=1),
+                      padding=2),
             nn.BatchNorm2d(num_features=32),
-            nn.Hardswish(),
-            # block 2 (32x32) -> (16x16)
+            nn.Hardswish()
+        ))
+        # block 2 (16x16) -> (8x8)
+        self.encoder.append(nn.Sequential(
             nn.Conv2d(in_channels=32,
                       out_channels=64,
-                      kernel_size=2,
+                      kernel_size=5,
                       stride=2,
-                      padding=1),
-            nn.BatchNorm2d(num_features=32),
-            nn.Hardswish(),
-            # block 3 (16x16) -> (8x8)
+                      padding=2),
+            nn.BatchNorm2d(num_features=64),
+            nn.Hardswish()
+        ))
+        # block 3 (8x8) -> (4x4)
+        self.encoder.append(nn.Sequential(
             nn.Conv2d(in_channels=64,
-                      out_channels=128,
-                      kernel_size=7,
+                      out_channels=256,
+                      kernel_size=5,
                       stride=2,
                       padding=2),
-            nn.BatchNorm2d(num_features=32),
+            nn.BatchNorm2d(num_features=256),
             nn.Hardswish(),
-            # block 4 (8x8) -> (4x4)
-            nn.Conv2d(in_channels=128,
-                      out_channels=512,
-                      kernel_size=7,
-                      stride=2,
-                      padding=2),
-            nn.BatchNorm2d(num_features=32),
+        ))
+        # block 3 (8x8) -> (4x4)
+        self.encoder.append(nn.Sequential(
+            nn.Conv2d(in_channels=256,
+                      out_channels=256,
+                      kernel_size=4,
+                      stride=1,
+                      padding=0),
+            nn.BatchNorm2d(num_features=256),
             nn.Hardswish(),
-        )
+        ))
 
         # combination of encoder and meta-data input
         self.combine = Combine()
 
         # bottleneck
-        ch = 1024
         self.bottleneck = nn.Sequential(
-            LinBnHs(ci=512 * 4 * 4 + 24, co=512 * 4 * 4),
+            LinBnHs(ci=256 + 24, co=228),
         )
 
-        self.decoder = nn.Sequential(
-            Reshape(co=228, ro=1),
-            # block 1
+        # decoder
+        self.decoder.append(
+            Reshape(co=228, ro=1)
+        )
+        self.decoder.append(nn.Sequential(
             nn.ConvTranspose2d(in_channels=228,
                                out_channels=448,
                                kernel_size=2,
-                               padding=1,
+                               stride=1,
                                bias=False),
             nn.BatchNorm2d(448),
-            nn.ReLU(),
-            # block 2
+            nn.ReLU()
+        ))
+        self.decoder.append(nn.Sequential(
             nn.ConvTranspose2d(in_channels=448,
                                out_channels=256,
                                kernel_size=4,
@@ -85,46 +96,57 @@ class ConvAE2(nn.Module, ABC):
                                padding=1,
                                bias=False),
             nn.BatchNorm2d(256),
-            nn.ReLU(),
-            # block 3
+            nn.ReLU()
+        ))
+        self.decoder.append(nn.Sequential(
             nn.ConvTranspose2d(in_channels=256,
                                out_channels=128,
                                kernel_size=4,
                                stride=2,
                                padding=1,
                                bias=False),
-            nn.ReLU(),
-            # block 4
+            nn.ReLU()
+        ))
+        self.decoder.append(nn.Sequential(
             nn.ConvTranspose2d(in_channels=128,
                                out_channels=64,
                                kernel_size=4,
                                stride=2,
                                padding=1,
                                bias=False),
-            nn.ReLU(),
-            # block 5
+            nn.ReLU()
+        ))
+        self.decoder.append(nn.Sequential(
             nn.ConvTranspose2d(in_channels=64,
                                out_channels=1,
                                kernel_size=4,
                                stride=2,
                                padding=1,
                                bias=False),
-            nn.ReLU(),
+            nn.ReLU()
+        ))
+        self.decoder.append(
             # upsample the 28x28px image to 32x32
             nn.Upsample(size=(32, 32), mode='bicubic', align_corners=False)
         )
 
     def forward(self, input_img, input_meta):
         timer = Timer(Log(None)).start()
-        x = self.encoder(input_img)
+        x = input_img
+        for block in self.encoder:
+            x = block(x)
         timer.stop('\t\tforwarded through encoder')
+
         timer.start()
         x = self.combine(x, input_meta)
         timer.stop('\t\tforwarded through combine')
+
         timer.start()
         x = self.bottleneck(x)
         timer.stop('\t\tforwarded through bottleneck')
+
         timer.start()
-        x = self.decoder(x)
+        for block in self.decoder:
+            x = block(x)
         timer.stop('\t\tforwarded through decoder')
         return x

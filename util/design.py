@@ -105,7 +105,7 @@ class Design:
         self.performance = Performance(n_validation_samples)
 
         # log
-        log.logprint(self.info())
+        log.__call__(self.info())
 
         return self
 
@@ -300,7 +300,7 @@ class Design:
             ))
         except (RuntimeError, EOFError):
             # if failed, try loading the backup
-            self._log.logprint('WARNING: loading file %s failed, trying '
+            self._log.__call__('WARNING: loading file %s failed, trying '
                                'to load backup' % file)
             if isinstance(backup, str):
                 backup = Path(backup)
@@ -310,7 +310,7 @@ class Design:
 
             self._from_dict(torch.load(backup,
                                        map_location=torch.device('cpu')))
-            self._log.logprint('INFO: successfully loaded backup')
+            self._log.__call__('INFO: successfully loaded backup')
 
         # set non serializable attributes
         self._log = log
@@ -363,7 +363,7 @@ class Design:
         self._timer.start()
 
         # print memory before starting to train
-        self._log.logprint('memory usage before training: \n'
+        self._log.__call__('memory usage before training: \n'
                            + self._log.memory_usage(' ' * 2))
 
         # loop over epochs
@@ -397,7 +397,7 @@ class Design:
             self._dls_train[0].dataset.dataset.shuffle()
 
             # print memory usage after each full epoch
-            self._log.logprint('memory usage:\n' +
+            self._log.__call__('memory usage:\n' +
                                self._log.memory_usage(' ' * 2))
 
             # # evaluate

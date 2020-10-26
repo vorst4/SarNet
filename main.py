@@ -14,7 +14,7 @@ from util.timer import Timer
 # -------------------------------- ARGUMENTS -------------------------------- #
 # On the server, several parameters should be passed when running the
 # script, this is not necessary when running it on the desktop
-if settings.is_running_on_desktop:
+if settings.RUNNING_ON_DESKTOP:
     partition_id = 0
     job_id = 1
     n_cpus = 4
@@ -33,7 +33,9 @@ else:
 # ----------------------------------- MISC ---------------------------------- #
 # models to be run
 # modelname = ['ResNetAE1', 'ConvAE1', 'DenseAE1'][job_id]
-modelname = 'ResNetAE2'
+# modelname = 'ResNetAE2'
+# modelname = 'ConvAE2'
+modelname = 'ConvUNet'
 
 # set/create root path from modelname
 settings.progress.path += '/' + modelname
@@ -41,12 +43,10 @@ if not Path(settings.progress.path).exists():
     Path(settings.progress.path).mkdir()
 
 # initialize log
-log = Log(directory=settings.directory_log,
-          prefix='log_%i_' % job_id,
-          save_log=settings.save_log)
+log = Log(settings.log)
 
 # print memory usage
-log.logprint('memory usage (cpu): ' + log.cpu_memory_usage())
+log('memory usage (cpu): ' + log.cpu_memory_usage())
 
 # create timer object
 timer = Timer(log)
@@ -54,7 +54,7 @@ timer = Timer(log)
 # --------------------------------- DATASET --------------------------------- #
 
 # log
-log.logprint('setting up dataset')
+log('setting up dataset')
 
 # transformation functions to be applied to training and validation dataset
 trans_train = transform.Compose([
@@ -78,7 +78,7 @@ dls_train, dls_valid = ds.dataloaders_train, ds.dataloaders_valid
 timer.stop('created dataset')
 
 # log memory usage
-log.logprint('...done, memory usage (cpu): ' + log.cpu_memory_usage())
+log('...done, memory usage (cpu): ' + log.cpu_memory_usage())
 
 # --------------------------------- DESIGN ---------------------------------- #
 
@@ -86,24 +86,24 @@ log.logprint('...done, memory usage (cpu): ' + log.cpu_memory_usage())
 lf = torch.nn.MSELoss()
 
 # model & optimizer
-log.logprint('initializing model...')
+log('initializing model...')
 model = Design.get_model_from_name(modelname)
 optimizer = torch.optim.Adam(
-    model.parameters(), lr=1e-5
+    model.parameters(), lr=1e-3
 )
-log.logprint('...done')
+log('...done')
 
 # design
-log.logprint('creating design...')
+log('creating design...')
 timer.start()
 design = Design().create(
     dls_train, dls_valid, model, lf, optimizer, None, settings.epochs, log
 )
 timer.stop('created design')
-log.logprint('...done')
+log('...done')
 
 # ---------------------------------- START ---------------------------------- #
 # start training
-log.logprint('--- training start --- ')
+log('--- training start --- ')
 design.train(settings.progress)
-log.logprint('--- training end ---')
+log('--- training end ---')

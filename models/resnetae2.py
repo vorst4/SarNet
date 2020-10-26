@@ -11,7 +11,7 @@ class ResNetAE2(nn.Module, ABC):
         super().__init__()
 
         c = 512  # channels
-        ri = settings.img_resolution  # resolution input
+        ri = settings.IMG_RESOLUTION  # resolution input
         ni_meta = 24  # number of meta-data input variables
         d = settings.dropout_rate
 

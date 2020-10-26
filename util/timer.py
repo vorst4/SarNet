@@ -7,7 +7,7 @@ class Timer:
     def __init__(self, log):
         self.timer = time()
         if log is None:
-            self.log = Log(None, save_log=False)
+            self.log = Log(None)
         else:
             self.log = log
 
@@ -20,5 +20,5 @@ class Timer:
 
     def stop(self, msg):
         if settings.log_timer:
-            self.log.logprint('timer % 8.2f sec | %s' % (self.time(), msg))
+            self.log.__call__('timer % 8.2f sec | %s' % (self.time(), msg))
         return self

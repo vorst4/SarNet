@@ -367,7 +367,7 @@ class Progress:
         es = self.design.get_epoch_stop()
         _, lt = self.design.performance.mse_train(idx=-1)
         _, lv = self.design.performance.mse_valid(idx=-1)
-        self.log.logprint(
+        self.log.__call__(
             'Epoch:%8.4f/%i, loss_train: %3.8f, loss_val: %3.8f' %
             (ec, es, lt, lv)
         )
@@ -401,7 +401,7 @@ class Progress:
             try:
                 fig.savefig(self.path_lossplot)
             except PermissionError:
-                self.log.logprint(
+                self.log.__call__(
                     'WARNING: permission error occurred during saving the '
                     'lossplot'
                 )

@@ -28,7 +28,7 @@ class TuneAdam:
         path = Path(self._dir).joinpath(filename)
         if path.exists():
             return
-        self._log.logprint(str(path))
+        self._log.__call__(str(path))
 
         # create and train design
         progress_settings = Progress.Settings(

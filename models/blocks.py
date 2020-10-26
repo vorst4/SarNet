@@ -8,7 +8,7 @@ from util.timer import Timer
 from util.log import Log
 
 _last_channels_out = 3  # permittivity, conductivity, density
-_last_resolution_out = settings.img_resolution
+_last_resolution_out = settings.IMG_RESOLUTION
 
 
 class Forward(nn.Module, ABC):
@@ -52,8 +52,9 @@ class Combine(nn.Module, ABC):
 
     @staticmethod
     def forward(x_encoder: torch.tensor, x_meta: torch.tensor):
-        return torch.cat((x_encoder.reshape(x_encoder.shape[0], -1), x_meta),
-                         dim=1)
+        return torch.cat(
+            (x_encoder.reshape(x_encoder.shape[0], -1), x_meta), dim=1
+        )
 
 
 class Upsample(nn.Upsample, ABC):
