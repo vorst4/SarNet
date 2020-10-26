@@ -109,14 +109,14 @@ class ConvUNet(nn.Module, ABC):
         )
         self.enc2 = Stage(64, 128, dr=dr)  # 32 -> 16
         self.enc3 = Stage(128, 256, dr=dr)  # 16 -> 8
-        self.enc4 = Stage(256, 512, dr=dr // 2)  # 8 -> 4
+        self.enc4 = Stage(256, 512, dr=dr)  # 8 -> 4
         self.enc5 = ConvBlock(ci=512, co=4096 - 24, k=4, s=1, p=0)  # 4 -> 1
 
         self.bn1 = blk.Combine()
         self.bn2 = blk.Reshape(co=4096, ro=1)
         self.bn3 = InvConvBlock(ci=4096, co=512, k=4, s=1, p=0)  # 1 -> 4
 
-        self.dec1 = InvStage(ci=512, co=256, mode='transpose', dr=dr//2)
+        self.dec1 = InvStage(ci=512, co=256, mode='transpose', dr=dr)
         self.dec2 = InvStage(ci=256, co=128, mode='transpose', dr=dr)
         self.dec3 = InvStage(ci=128, co=64, mode='transpose', dr=dr)
         self.dec4 = nn.Sequential(
