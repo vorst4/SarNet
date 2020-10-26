@@ -114,7 +114,7 @@ class ConvUNet(nn.Module, ABC):
         self.dec4 = nn.Sequential(
             ConvBlock(ci=128, co=64, k=3, s=1, p=1),
             ConvBlock(ci=64, co=64, k=3, s=1, p=1),
-            ConvBlock(ci=64, co=2, k=1, s=1, p=0),
+            ConvBlock(ci=64, co=1, k=1, s=1, p=0),
         )
 
     def forward(self, input_img, input_meta):

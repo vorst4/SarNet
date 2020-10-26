@@ -21,9 +21,9 @@ if RUNNING_ON_DESKTOP:
     # dataset settings
     dataset = Dataset.Settings(
         file='dataset_sar.zip',
-        max_samples=1000,
+        max_samples=MAX_SAMPLES,
         train_pct=90,
-        n_subsets=1,
+        n_subsets=100,
         shuffle_train=True,
         shuffle_valid=True,
     )
