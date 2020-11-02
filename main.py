@@ -42,6 +42,8 @@ modelname = 'ResNetAE3'
 
 # set/create root path from modelname
 settings.progress.path += '/' + modelname
+if not Path(settings.progress.path.rsplit('/', 1)[0]).exists():
+    Path(settings.progress.path.rsplit('/', 1)[0]).mkdir()
 if not Path(settings.progress.path).exists():
     Path(settings.progress.path).mkdir()
 
@@ -89,14 +91,16 @@ log('...done, memory usage (cpu): ' + log.cpu_memory_usage())
 
 # loss function
 lf = torch.nn.MSELoss()
+log('using loss function: %s' % str(lf))
 
 # model & optimizer
 log('initializing model...')
 model = Design.get_model_from_name(modelname)
+log('...done')
 optimizer = torch.optim.Adam(
     model.parameters(), lr=1e-5
 )
-log('...done')
+log('using optimizer: \n  %s' % str(optimizer).replace('\n', '\n  '))
 
 # design
 log('creating design...')

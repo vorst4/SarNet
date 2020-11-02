@@ -36,7 +36,7 @@ class Log:
             return
 
         # get current date and time as string
-        time_str = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        time_str = self.date_time()
 
         # define log path
         if isinstance(settings.directory, str):
@@ -65,8 +65,12 @@ class Log:
                             'check permissions')
 
     @staticmethod
-    def _timestamp():
+    def _timestamp() -> str:
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ' |   '
+
+    @staticmethod
+    def date_time() -> str:
+        return datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
     @staticmethod
     def _indent():

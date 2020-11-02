@@ -52,8 +52,9 @@ if RUNNING_ON_DESKTOP:
         lossplot=False,
         preview=False,
         load_design=False,
-        save_design=False,
-        path='C:/Users/Dennis/Documents/desktop_resnet_output',
+        save_design=True,
+        path='C:/Users/Dennis/Documents/desktop_resnet_output/' +
+             Log.date_time(),
         save_lossplot=True,
         save_preview=True,
     )
