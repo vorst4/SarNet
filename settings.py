@@ -78,7 +78,7 @@ else:
 
     # log
     log = Log.Settings(
-        directory='output',
+        directory=None,
         save_log=True,
     )
 
