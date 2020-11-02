@@ -36,8 +36,9 @@ else:
 # modelname = 'ResNetAE2'
 # modelname = 'ConvAE2'
 # modelname = 'ConvUNet'
-modelname = 'ConvUNet2'
+# modelname = 'ConvUNet2'
 # modelname = 'ResUNet'
+modelname = 'ResNetAE3'
 
 # set/create root path from modelname
 settings.progress.path += '/' + modelname

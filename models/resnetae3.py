@@ -2,6 +2,7 @@ import torch.nn as nn
 from abc import ABC
 import models.blocks as blk
 import settings
+import torch
 
 
 class ConvBnHs(nn.Module, ABC):
@@ -56,78 +57,74 @@ class ResNetAE3(nn.Module, ABC):
         d = settings.dropout_rate
 
         self.enc1 = blk.InvResBlock(co=c // 32, k=3,
-                                    downsample=False,
-                                    dropout=d * (1 - 0.2 * 0),
+                                    dropout=d,
                                     expand=False,
                                     squeeze=False)
-        self.enc2 = nn.Conv2d(in_channels=c // 32,
-                              out_channels=c // 32,
-                              kernel_size=2,
-                              stride=2,
-                              bias=False)
-        # self.enc3
-        self.enc2 = blk.InvResBlock(co=c // 16, k=3,
-                                    downsample=True,
-                                    dropout=d * (1 - 0.2 * 1),
+        self.enc2 = ConvBnHs(ci=c // 32, co=c // 32)  # 32 --> 16
+        self.enc3 = blk.InvResBlock(co=c // 16, k=3,
+                                    dropout=d,
                                     expand=False,
                                     squeeze=False)
-        self.enc3 = blk.InvResBlock(co=c // 8, k=3,
-                                    downsample=True,
-                                    dropout=d * (1 - 0.2 * 2),
+        self.enc4 = ConvBnHs(ci=c // 16, co=c // 16)  # 16 --> 8
+        self.enc5 = blk.InvResBlock(co=c // 8, k=3,
+                                    dropout=d,
                                     expand=False,
                                     squeeze=False)
-        self.enc2 = blk.InvResBlock(co=c // 4, k=3,
-                                    downsample=True,
-                                    dropout=d * (1 - 0.2 * 3),
+        self.enc6 = ConvBnHs(ci=c // 8, co=c // 8)  # 8 --> 4
+        self.enc7 = blk.InvResBlock(co=c // 4, k=3,
+                                    dropout=d,
                                     expand=False,
                                     squeeze=False)
-        self.enc2 = blk.InvResBlock(co=c // 2, k=3,
-                                    downsample=True,
-                                    dropout=d * (1 - 0.2 * 4),
-                                    expand=False,
-                                    squeeze=False)
-        self.enc2 = blk.InvResBlock(co=c, k=3,
-                                    downsample=True,
-                                    dropout=d * (1 - 0.2 * 5),
-                                    expand=False,
-                                    squeeze=False)
+        self.enc8 = ConvBnHs(ci=c // 4, co=c - 24, k=4, s=1)  # 4 --> 1
 
-        self.decoder = nn.Sequential(
-            blk.Reshape(co=c, ro=1),
-            blk.InvResBlock(co=c, k=2,
-                            upsample=True,
-                            dropout=d * (1 - 0.2 * 4),
-                            expand=False,
-                            squeeze=False),
-            blk.InvResBlock(co=c // 2, k=2,
-                            upsample=True,
-                            dropout=d * (1 - 0.2 * 3),
-                            expand=False,
-                            squeeze=False),
-            blk.InvResBlock(co=c // 4, k=2,
-                            upsample=True,
-                            dropout=d * (1 - 0.2 * 2),
-                            expand=False,
-                            squeeze=False),
-            blk.InvResBlock(co=c // 8, k=3,
-                            upsample=True,
-                            upsample_mode='bicubic',
-                            dropout=d * (1 - 0.2 * 1),
-                            expand=False,
-                            squeeze=False),
-            blk.InvResBlock(co=c // 16, k=3,
-                            upsample=True,
-                            upsample_mode='bicubic',
-                            dropout=d * (1 - 0.2 * 0),
-                            expand=False,
-                            squeeze=False),
-            blk.Conv2d(co=1, k=3, p=1, bias=True),
-
-        )
+        # decoder
+        self.dec1 = ConvBnHs(ci=c, co=c // 4, k=4, s=1, t=True)  # 1 --> 4
+        self.dec2 = blk.InvResBlock(ci=c // 4, co=c // 8, k=3,
+                                    dropout=d,
+                                    expand=False,
+                                    squeeze=False)
+        self.dec3 = ConvBnHs(ci=c // 8, co=c // 8, t=True)  # 4 --> 8
+        self.dec4 = blk.InvResBlock(co=c // 16, k=3,
+                                    dropout=d,
+                                    expand=False,
+                                    squeeze=False)
+        self.dec5 = ConvBnHs(ci=c // 16, co=c // 16, t=True)  # 8 --> 16
+        self.dec6 = blk.InvResBlock(co=c // 32, k=3,
+                                    dropout=d,
+                                    expand=False,
+                                    squeeze=False)
+        self.dec7 = ConvBnHs(ci=c // 32, co=c // 32, t=True)  # 16 --> 32
+        self.dec8 = blk.InvResBlock(co=c // 32, k=3,
+                                    dropout=d,
+                                    expand=False,
+                                    squeeze=False)
+        self.dec9 = blk.Conv2d(co=1, k=3, p=1, bias=True)
 
     def forward(self, input_img, input_meta):
-        x = self.encoder(input_img)
-        x = self.combine(x, input_meta)
-        x = self.bottleneck(x)
-        x = self.decoder(x)
+        # encoder
+        x = input_img
+        x = self.enc1(x)
+        x = self.enc2(x)
+        x = self.enc3(x)
+        x = self.enc4(x)
+        x = self.enc5(x)
+        x = self.enc6(x)
+        x = self.enc7(x)
+        x = self.enc8(x)
+
+        # bottleneck
+        n = x.shape[0]
+        x = torch.cat([x, input_meta.reshape(n, -1, 1, 1)], dim=1)
+
+        # decoder
+        x = self.dec1(x)
+        x = self.dec2(x)
+        x = self.dec3(x)
+        x = self.dec4(x)
+        x = self.dec5(x)
+        x = self.dec6(x)
+        x = self.dec7(x)
+        x = self.dec8(x)
+        x = self.dec9(x)
+
         return x

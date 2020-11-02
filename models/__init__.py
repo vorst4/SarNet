@@ -10,3 +10,4 @@ from .resnetae2 import ResNetAE2
 from .convunet import ConvUNet
 from .resunet import ResUNet
 from .convunet2 import ConvUNet2
+from .resnetae3 import ResNetAE3
