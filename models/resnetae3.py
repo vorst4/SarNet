@@ -93,8 +93,9 @@ class ResNetAE3(nn.Module, ABC):
                                     dropout=d,
                                     expand=False,
                                     squeeze=False)
-        self.dec7 = nn.Upsample(size=(ri, ri), mode='bicubic')
-        self.dec7 = ConvBnHs(ci=c // 32, co=c // 32, t=True)  # 16 --> 32
+        self.dec7 = nn.Upsample(size=(ri, ri),
+                                mode='bicubic',
+                                align_corners=False)  # 16 --> 32
         self.dec8 = blk.InvResBlock(co=c // 32, k=3,
                                     dropout=d,
                                     expand=False,
