@@ -69,9 +69,9 @@ else:
     dataset = Dataset.Settings(
         file='dataset_sar.zip',
         # file='dataset_msf.zip',
-        max_samples=MAX_SAMPLES // 100,
+        max_samples=MAX_SAMPLES,
         train_pct=90,
-        n_subsets=1000 // 100,
+        n_subsets=1000,
         shuffle_train=True,
         shuffle_valid=True,
     )
@@ -82,7 +82,7 @@ else:
         save_log=True,
     )
 
-    dropout_rate = 0.4
+    dropout_rate = 0.5
 
     # log the timer or not
     log_timer = False
@@ -99,7 +99,7 @@ else:
 
     # progress logging settings
     progress = Progress.Settings(
-        save_design=False,
+        save_design=True,
         load_design=False,
         path='/home/tue/s111167/trained_models/' + Log.date_time(),
         save_lossplot=True,

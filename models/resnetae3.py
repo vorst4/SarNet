@@ -51,7 +51,7 @@ class ResNetAE3(nn.Module, ABC):
     def __init__(self):
         super().__init__()
 
-        c = 512  # channels
+        c = 1024  # channels
         ri = settings.IMG_RESOLUTION  # resolution input
         ni_meta = 24  # number of meta-data input variables
         d = settings.dropout_rate
@@ -75,7 +75,7 @@ class ResNetAE3(nn.Module, ABC):
                                     dropout=d,
                                     expand=False,
                                     squeeze=False)
-        self.enc8 = ConvBnHs(ci=c // 4, co=c - 24, k=4, s=1)  # 4 --> 1
+        self.enc8 = ConvBnHs(ci=c // 4, co=c - ni_meta, k=4, s=1)  # 4 --> 1
 
         # decoder
         self.dec1 = ConvBnHs(ci=c, co=c // 4, k=4, s=1, t=True)  # 1 --> 4
@@ -93,6 +93,7 @@ class ResNetAE3(nn.Module, ABC):
                                     dropout=d,
                                     expand=False,
                                     squeeze=False)
+        self.dec7 = nn.Upsample(size=(ri, ri), mode='bicubic')
         self.dec7 = ConvBnHs(ci=c // 32, co=c // 32, t=True)  # 16 --> 32
         self.dec8 = blk.InvResBlock(co=c // 32, k=3,
                                     dropout=d,
