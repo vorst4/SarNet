@@ -69,4 +69,5 @@ do
           --mail-user=d.m.n.v.d.vorst@student.tue.nl \
           --mail-type=ALL \
           task.sh
+  wait 1
 done
