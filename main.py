@@ -94,7 +94,7 @@ lf = torch.nn.MSELoss()
 log('initializing model...')
 model = Design.get_model_from_name(modelname)
 optimizer = torch.optim.Adam(
-    model.parameters(), lr=1e-3
+    model.parameters(), lr=1e-6
 )
 log('...done')
 
