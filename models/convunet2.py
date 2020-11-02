@@ -130,8 +130,9 @@ class ConvUNet2(nn.Module, ABC):
         x4 = self.enc4(x3)
         x = self.enc5(x4)
 
-        x = self.bn1(x, input_meta)
-        x = self.bn2(x)
+        # combine
+        n = x.shape[0]
+        x = torch.cat([x, input_meta.reshape(n, -1, 1, 1)], dim=1)
         x = self.bn3(x)
 
         x = self.dec1(x, x4)

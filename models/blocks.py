@@ -12,8 +12,17 @@ _last_channels_out = 3  # permittivity, conductivity, density
 _last_resolution_out = settings.IMG_RESOLUTION
 
 
-class Forward(nn.Module, ABC):
+# class Forward(torch.autograd.Function):
+#
+#     @staticmethod
+#     def forward(ctx: Any, *args: Any, **kwargs: Any) -> Any:
+#         return args[0]
+#
+#     @staticmethod
+#     def backward(ctx: Any, *grad_outputs: Any) -> Any:
+#         return grad_outputs[0]
 
+class Forward(nn.Module, ABC):
     @staticmethod
     def forward(x):
         return x
@@ -51,32 +60,33 @@ class Combine(nn.Module, ABC):
     def __init__(self):
         print('creating combine block')
         super().__init__()
-        self.combine = _CombineFunc()
+        # self.combine = _CombineFunc()
 
     @staticmethod
-    def forward(x_encoder: torch.tensor, x_meta: torch.tensor):
-        return _CombineFunc.apply(x_encoder, x_meta)
+    def forward(x_enc: torch.tensor, x_meta: torch.tensor):
+        return torch.cat((x_enc.reshape(x_enc.shape[0], -1), x_meta), dim=1)
 
 
-class _CombineFunc(torch.autograd.Function):
-    # todo: this class currently can't be saved by pytorch, this nees to be
-    #  fixed
-
-    @staticmethod
-    def forward(ctx: Any, *args: Any, **kwargs: Any) -> Any:
-        x_enc: torch.Tensor = args[0]
-        x_meta: torch.Tensor = args[1]
-        ctx.save_for_backward(x_enc, x_meta)
-        return torch.cat([x_enc.reshape(args[0].shape[0], -1), x_meta], dim=1)
-
-    @staticmethod
-    def backward(ctx: Any, *grad_outputs: Any) -> Any:
-        shape_enc = ctx.saved_tensors[0].shape
-        n_enc = shape_enc[1]
-        return (
-            grad_outputs[0][:, :n_enc].reshape(shape_enc),
-            grad_outputs[0][:, n_enc:]
-        )
+# class _CombineFunc(torch.autograd.Function):
+#     # todo: this class currently can't be saved by pytorch, this needs to be
+#     #  fixed
+#
+#     @staticmethod
+#     def forward(ctx: Any, *args: Any, **kwargs: Any) -> Any:
+#         x_enc: torch.Tensor = args[0]
+#         x_meta: torch.Tensor = args[1]
+#         ctx.save_for_backward(x_enc, x_meta)
+#         return torch.cat([x_enc.reshape(args[0].shape[0], -1), x_meta],
+#         dim=1)
+#
+#     @staticmethod
+#     def backward(ctx: Any, *grad_outputs: Any) -> Any:
+#         shape_enc = ctx.saved_tensors[0].shape
+#         n_enc = shape_enc[1]
+#         return (
+#             grad_outputs[0][:, :n_enc].reshape(shape_enc),
+#             grad_outputs[0][:, n_enc:]
+#         )
 
     # def forward(self, input):
     #     x_encoder: torch.tensor, x_meta: torch.tensor
@@ -107,6 +117,18 @@ class Reshape(nn.Module, ABC):
 
     def forward(self, x):
         return x.reshape(self.shape)
+
+
+# class ReshapeFunc(torch.autograd.Function):
+#     @staticmethod
+#     def forward(ctx: Any, *args: Any, **kwargs: Any) -> Any:
+#         shape = args[0].shape.copy()
+#         ctx.save_for_backward(shape)
+#         pass
+#
+#     @staticmethod
+#     def backward(ctx: Any, *grad_outputs: Any) -> Any:
+#         pass
 
 
 class LinBnHs(nn.Module, ABC):
