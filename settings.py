@@ -70,7 +70,7 @@ else:
         # file='dataset_msf.zip',
         max_samples=MAX_SAMPLES // 100,
         train_pct=90,
-        n_subsets=1000 // 10,
+        n_subsets=1000 // 100,
         shuffle_train=True,
         shuffle_valid=True,
     )
@@ -100,8 +100,8 @@ else:
     progress = Progress.Settings(
         save_design=False,
         load_design=False,
-        path='/home/tue/s111167/trained_models_sar',
-        # path='/home/tue/s111167/trained_models_msf',
+        # path='/home/tue/s111167/trained_models_sar',
+        path='/home/tue/s111167/trained_models_msf',
         save_lossplot=True,
         save_preview=True,
     )
