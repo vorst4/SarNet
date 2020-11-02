@@ -2,6 +2,7 @@ from abc import ABC
 
 import torch
 import torch.nn as nn
+from typing import Any
 
 import settings
 from util.timer import Timer
@@ -48,13 +49,45 @@ class Conv2d(nn.Conv2d, ABC):
 
 class Combine(nn.Module, ABC):
     def __init__(self):
+        print('creating combine block')
         super().__init__()
+        self.combine = _CombineFunc()
 
     @staticmethod
     def forward(x_encoder: torch.tensor, x_meta: torch.tensor):
-        return torch.cat(
-            (x_encoder.reshape(x_encoder.shape[0], -1), x_meta), dim=1
+        return _CombineFunc.apply(x_encoder, x_meta)
+
+
+class _CombineFunc(torch.autograd.Function):
+    # todo: this class currently can't be saved by pytorch, this nees to be
+    #  fixed
+
+    @staticmethod
+    def forward(ctx: Any, *args: Any, **kwargs: Any) -> Any:
+        x_enc: torch.Tensor = args[0]
+        x_meta: torch.Tensor = args[1]
+        ctx.save_for_backward(x_enc, x_meta)
+        return torch.cat([x_enc.reshape(args[0].shape[0], -1), x_meta], dim=1)
+
+    @staticmethod
+    def backward(ctx: Any, *grad_outputs: Any) -> Any:
+        shape_enc = ctx.saved_tensors[0].shape
+        n_enc = shape_enc[1]
+        return (
+            grad_outputs[0][:, :n_enc].reshape(shape_enc),
+            grad_outputs[0][:, n_enc:]
         )
+
+    # def forward(self, input):
+    #     x_encoder: torch.tensor, x_meta: torch.tensor
+    #     return torch.cat(
+    #         (x_encoder.reshape(x_encoder.shape[0], -1), x_meta), dim=1
+    #     )
+
+    # @staticmethod
+    # def backward(gradient):
+    #     print(gradient.shape)
+    #     return gradient
 
 
 class Upsample(nn.Upsample, ABC):
@@ -465,7 +498,8 @@ class InverseResidualEncoder(nn.Module, ABC):
         self.encoder = nn.Sequential(
             # Use just a convolutional layer for the first layer
             InvResBlock(ci=3, co=32, ri=64, k=3, expand=False, squeeze=False),
-            InvResBlock(ci=32, co=64, ri=64, k=3, expand=False, downsample=True),
+            InvResBlock(ci=32, co=64, ri=64, k=3, expand=False,
+                        downsample=True),
             InvResBlock(ci=64, co=96, ri=32, k=5, downsample=True),
             InvResBlock(ci=96, co=128, ri=16, k=3, downsample=True),
             InvResBlock(ci=128, co=256, ri=8, k=5, downsample=True),

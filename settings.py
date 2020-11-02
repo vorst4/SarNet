@@ -17,9 +17,9 @@ if RUNNING_ON_DESKTOP:
 
     # dataset settings
     dataset = Dataset.Settings(
-        # file='dataset_sar.zip',
-        file='dataset_msf.zip',
-        max_samples=MAX_SAMPLES,
+        file='dataset_sar.zip',
+        # file='dataset_msf.zip',
+        max_samples=1000,
         train_pct=90,
         n_subsets=100,
         shuffle_train=True,
@@ -52,7 +52,7 @@ if RUNNING_ON_DESKTOP:
         lossplot=False,
         preview=False,
         load_design=False,
-        save_design=True,
+        save_design=False,
         path='C:/Users/Dennis/Documents/desktop_resnet_output',
         save_lossplot=True,
         save_preview=True,
@@ -66,8 +66,8 @@ else:
 
     # dataset
     dataset = Dataset.Settings(
-        # file='dataset_sar.zip',
-        file='dataset_msf.zip',
+        file='dataset_sar.zip',
+        # file='dataset_msf.zip',
         max_samples=MAX_SAMPLES // 100,
         train_pct=90,
         n_subsets=1000 // 10,
@@ -98,10 +98,10 @@ else:
 
     # progress logging settings
     progress = Progress.Settings(
-        save_design=True,
+        save_design=False,
         load_design=False,
-        # path='/home/tue/s111167/trained_models',
-        path='/home/tue/s111167/trained_models_msf',
+        path='/home/tue/s111167/trained_models_sar',
+        # path='/home/tue/s111167/trained_models_msf',
         save_lossplot=True,
         save_preview=True,
     )
