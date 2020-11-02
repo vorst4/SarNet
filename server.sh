@@ -69,5 +69,5 @@ do
           --mail-user=d.m.n.v.d.vorst@student.tue.nl \
           --mail-type=ALL \
           task.sh
-  sleep 1
+  sleep 3
 done
