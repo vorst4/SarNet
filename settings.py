@@ -101,8 +101,7 @@ else:
     progress = Progress.Settings(
         save_design=False,
         load_design=False,
-        # path='/home/tue/s111167/trained_models_sar',
-        path='/home/tue/s111167/trained_models_msf',
+        path='/home/tue/s111167/trained_models/' + Log.date_time(),
         save_lossplot=True,
         save_preview=True,
     )
