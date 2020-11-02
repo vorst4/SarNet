@@ -16,7 +16,7 @@ from util.timer import Timer
 # script, this is not necessary when running it on the desktop
 if settings.RUNNING_ON_DESKTOP:
     partition_id = 0
-    job_id = 1
+    job_id = 2
     n_cpus = 4
     n_gpus = 1
 else:
@@ -40,14 +40,19 @@ else:
 # modelname = 'ResUNet'
 modelname = 'ResNetAE3'
 
+learning_rates = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
+lr = learning_rates[job_id]
+
 # set/create root path from modelname
-settings.progress.path += '/' + modelname
+settings.progress.path = str(settings.progress.path) + '/' + modelname
 if not Path(settings.progress.path.rsplit('/', 1)[0]).exists():
     Path(settings.progress.path.rsplit('/', 1)[0]).mkdir()
 if not Path(settings.progress.path).exists():
     Path(settings.progress.path).mkdir()
 
 # initialize log
+if settings.log.directory is None:
+    settings.log.directory = str(settings.progress.path)
 settings.log.filename_prefix += modelname + '_'
 print(settings.log.filename_prefix)
 log = Log(settings.log)
@@ -58,7 +63,7 @@ log('memory usage (cpu): ' + log.cpu_memory_usage())
 # create timer object
 timer = Timer(log)
 
-# --------------------------------- DATASET --------------------------------- #
+# ------------------------------ DATASET ------------------------------ #
 
 # log
 log('setting up dataset')
@@ -87,7 +92,7 @@ timer.stop('created dataset')
 # log memory usage
 log('...done, memory usage (cpu): ' + log.cpu_memory_usage())
 
-# --------------------------------- DESIGN ---------------------------------- #
+# ------------------------------ DESIGN ------------------------------- #
 
 # loss function
 lf = torch.nn.MSELoss()
@@ -97,8 +102,9 @@ log('using loss function: %s' % str(lf))
 log('initializing model...')
 model = Design.get_model_from_name(modelname)
 log('...done')
+
 optimizer = torch.optim.Adam(
-    model.parameters(), lr=1e-5
+    model.parameters(), lr=lr
 )
 log('using optimizer: \n  %s' % str(optimizer).replace('\n', '\n  '))
 
@@ -111,7 +117,7 @@ design = Design().create(
 timer.stop('created design')
 log('...done')
 
-# ---------------------------------- START ---------------------------------- #
+# ------------------------------- START ------------------------------- #
 # start training
 log('--- training start --- ')
 design.train(settings.progress)

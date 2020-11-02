@@ -69,8 +69,8 @@ class Log:
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3] + ' |   '
 
     @staticmethod
-    def date_time() -> str:
-        return datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    def date_time(time_format: str = '%Y-%m-%d_%H-%M-%S.%f') -> str:
+        return datetime.now().strftime(time_format).replace('.', '_')
 
     @staticmethod
     def _indent():

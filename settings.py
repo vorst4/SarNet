@@ -19,19 +19,19 @@ if RUNNING_ON_DESKTOP:
     dataset = Dataset.Settings(
         file='dataset_sar.zip',
         # file='dataset_msf.zip',
-        max_samples=1000,
+        max_samples=100,
         train_pct=90,
-        n_subsets=100,
+        n_subsets=10,
         shuffle_train=True,
         shuffle_valid=True,
     )
 
     log = Log.Settings(
-        directory='output',
-        save_log=False,
+        directory=None,
+        save_log=True,
     )
 
-    dropout_rate = 0.2
+    dropout_rate = 0.5
 
     # log the timer or not
     log_timer = False
@@ -44,7 +44,7 @@ if RUNNING_ON_DESKTOP:
 
     # settings learning-rate tuner
     # beta1s = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.999]
-    epochs = 10
+    epochs = 1
 
     # progress logging settings
     progress = Progress.Settings(
@@ -95,7 +95,7 @@ else:
 
     # settings learning-rate tuner
     # beta1s = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.999]
-    epochs = 10
+    epochs = 20
 
     # progress logging settings
     progress = Progress.Settings(
