@@ -82,7 +82,7 @@ else:
         save_log=True,
     )
 
-    dropout_rate = 0.5
+    dropout_rate = 0.4
 
     # log the timer or not
     log_timer = False

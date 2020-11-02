@@ -86,6 +86,7 @@ ds = Dataset(settings.dataset,
              # trans_train=trans_train,  # todo: check if these are correct
              # trans_val=trans_val  # todo: check if these are correct
              )
+log('dataset file: %s' % str(ds.settings.file))
 dls_train, dls_valid = ds.dataloaders_train, ds.dataloaders_valid
 timer.stop('created dataset')
 
