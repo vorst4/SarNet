@@ -2,7 +2,7 @@ from abc import ABC
 
 import torch
 import torch.nn as nn
-from typing import Any
+from typing import Any, Union
 
 import settings
 from util.timer import Timer
@@ -12,96 +12,14 @@ _last_channels_out = 3  # permittivity, conductivity, density
 _last_resolution_out = settings.IMG_RESOLUTION
 
 
-# class Forward(torch.autograd.Function):
-#
-#     @staticmethod
-#     def forward(ctx: Any, *args: Any, **kwargs: Any) -> Any:
-#         return args[0]
-#
-#     @staticmethod
-#     def backward(ctx: Any, *grad_outputs: Any) -> Any:
-#         return grad_outputs[0]
-
 class Forward(nn.Module, ABC):
     @staticmethod
     def forward(x):
         return x
 
 
-class Conv2d(nn.Conv2d, ABC):
-
-    def __init__(self,
-                 co,  # channels output
-                 ci=None,  # channels input
-                 k=3,  # kernel size
-                 s=1,  # stride
-                 p=0,  # padding
-                 d=1,  # dilation
-                 groups=1,
-                 bias=False,
-                 mode='zeros'
-                 ):
-        global _last_channels_out
-        ci = _last_channels_out if ci is None else ci
-        _last_channels_out = co
-
-        super().__init__(in_channels=ci,
-                         out_channels=co,
-                         kernel_size=k,
-                         stride=s,
-                         padding=p,
-                         dilation=d,
-                         groups=groups,
-                         bias=bias,
-                         padding_mode=mode)
-
-
-class Combine(nn.Module, ABC):
-    def __init__(self):
-        print('creating combine block')
-        super().__init__()
-        # self.combine = _CombineFunc()
-
-    @staticmethod
-    def forward(x_enc: torch.tensor, x_meta: torch.tensor):
-        return torch.cat((x_enc.reshape(x_enc.shape[0], -1), x_meta), dim=1)
-
-
-# class _CombineFunc(torch.autograd.Function):
-#     # todo: this class currently can't be saved by pytorch, this needs to be
-#     #  fixed
-#
-#     @staticmethod
-#     def forward(ctx: Any, *args: Any, **kwargs: Any) -> Any:
-#         x_enc: torch.Tensor = args[0]
-#         x_meta: torch.Tensor = args[1]
-#         ctx.save_for_backward(x_enc, x_meta)
-#         return torch.cat([x_enc.reshape(args[0].shape[0], -1), x_meta],
-#         dim=1)
-#
-#     @staticmethod
-#     def backward(ctx: Any, *grad_outputs: Any) -> Any:
-#         shape_enc = ctx.saved_tensors[0].shape
-#         n_enc = shape_enc[1]
-#         return (
-#             grad_outputs[0][:, :n_enc].reshape(shape_enc),
-#             grad_outputs[0][:, n_enc:]
-#         )
-
-    # def forward(self, input):
-    #     x_encoder: torch.tensor, x_meta: torch.tensor
-    #     return torch.cat(
-    #         (x_encoder.reshape(x_encoder.shape[0], -1), x_meta), dim=1
-    #     )
-
-    # @staticmethod
-    # def backward(gradient):
-    #     print(gradient.shape)
-    #     return gradient
-
-
 class Upsample(nn.Upsample, ABC):
-    def __init__(self, scale_factor=2, mode='bicubic'):
+    def __init__(self):
         super().__init__(scale_factor=2, mode='bicubic', align_corners=False)
 
 
@@ -119,19 +37,12 @@ class Reshape(nn.Module, ABC):
         return x.reshape(self.shape)
 
 
-# class ReshapeFunc(torch.autograd.Function):
-#     @staticmethod
-#     def forward(ctx: Any, *args: Any, **kwargs: Any) -> Any:
-#         shape = args[0].shape.copy()
-#         ctx.save_for_backward(shape)
-#         pass
-#
-#     @staticmethod
-#     def backward(ctx: Any, *grad_outputs: Any) -> Any:
-#         pass
-
-
 class LinBnHs(nn.Module, ABC):
+    """
+    ci: channels input
+    co: channels output
+    """
+
     def __init__(
             self,
             co: int,  # number of output channels
@@ -150,20 +61,41 @@ class LinBnHs(nn.Module, ABC):
         return self.hs(self.bn(self.lin(x)))
 
 
+class LinBnHsDo(LinBnHs, ABC):
+    """
+    dr : dropout rate
+    """
+
+    def __init__(self, co: int, ci: int, dr: float):
+        super().__init__(co=co, ci=ci)
+        self.dr = nn.Dropout(p=dr)
+
+    def forward(self, x):
+        return self.dr(self.hs(self.bn(self.lin(x))))
+
+
 class ConvBnHs(nn.Module, ABC):
     """
     (Transpose) Convolutional filter + batch normalisation + hard swish
+
+    ci: input channels
+    co: output channels
+    k: kernel size
+    s: stride
+    p: padding
+    po: output padding (only for tranpose convolutions)
+    t: to use transpose convolutions or not
     """
 
     def __init__(
             self,
-            ci: int = None,  # input channels
-            co: int = None,  # output channels
-            k: int = 3,  # kernel size
-            s: int = 1,  # stride
-            p: int = None,  # padding, if None -> padding is self determined
-            po: int = 1,  # output_padding (only applies for transpose conv)
-            t: bool = False  # transpose convolution or not
+            ci: int = None,
+            co: int = None,
+            k: int = 3,
+            s: int = 1,
+            p: int = None,
+            po: int = 1,
+            t: bool = False
     ):
         super().__init__()
         global _last_channels_out
@@ -203,43 +135,23 @@ class ConvBnHs(nn.Module, ABC):
         return self.hs(self.bn(self.conv(x)))
 
 
-# class RepIResBlock(nn.Module, ABC):
-#     """
-#     Repeats the IResBlock <n_rep> times, in series.
-#
-#     1. If downsample is true then only the first repetition is down-sampled,
-#        the others are not.
-#     2. The first block uses in_channel as the input channel, all other
-#        blocks use out_channel as the output channel.
-#     """
-#
-#     def __init__(self,
-#                  n_rep: int,
-#                  in_channels: int,
-#                  out_channels: int,
-#                  in_resolution: int,
-#                  kernel_size: [3, 5, 7] = 3,
-#                  downsample: bool = False,
-#                  expand=True,
-#                  squeeze_and_excite: bool = True):
-#         super().__init__()
-#         self.blocks = []
-#         resolution = in_resolution // 2 if downsample else in_resolution
-#         for idx in range(n_rep):
-#             self.blocks.append(IResBlock(
-#                 in_channels if idx == 0 else out_channels,
-#                 out_channels,
-#                 in_resolution if idx == 0 else resolution,
-#                 kernel_size,
-#                 downsample if idx == 0 else False,
-#                 expand,
-#                 squeeze_and_excite
-#             ))
-#
-#     def forward(self, x):
-#         for block in self.blocks:
-#             x = block(x)
-#         return x
+class ConvBnHsDr(ConvBnHs, ABC):
+    def __init__(
+            self,
+            ci: int,
+            co: int,
+            k: int,
+            s: int = 1,
+            p: int = 0,
+            dr: float = settings.dropout_rate,
+            po: int = 0,
+            t: bool = False
+    ):
+        super().__init__(ci=ci, co=co, k=k, s=s, p=p, po=po, t=t)
+        self.dr = nn.Dropout2d(p=dr)
+
+    def forward(self, x):
+        return self.dr(self.hs(self.bn(self.conv(x))))
 
 
 class InvResBlock(nn.Module, ABC):
@@ -460,74 +372,3 @@ class InvResBlock(nn.Module, ABC):
         # timer2.stop('\t\t\tforwarded: inverse resnet block')
         # print(x)
         return x + self.identity(i)
-
-
-class TransposeResNetBlock(nn.Module, ABC):
-
-    def __init__(self, filter_in, filter_out):
-        super().__init__()
-        self.identity = nn.Sequential(
-            nn.ConvTranspose2d(filter_in, filter_out, kernel_size=2,
-                               stride=2, padding=0, bias=False),
-            nn.BatchNorm2d(filter_out))
-        self.residual = nn.Sequential(
-            nn.ConvTranspose2d(filter_in, filter_out, kernel_size=4,
-                               stride=2, padding=1, bias=False),
-            nn.BatchNorm2d(filter_out),
-            nn.ReLU(),
-            nn.Conv2d(filter_out, filter_out, kernel_size=3, stride=1,
-                      padding=1, bias=False),
-            nn.BatchNorm2d(filter_out))
-        self.relu = nn.ReLU()
-
-    def forward(self, x):
-        r = self.residual(x)
-        i = self.identity(x)
-        x = r + i
-        x = self.relu(x)
-        return x
-
-
-class ResNetBlock(nn.Module, ABC):
-
-    def __init__(self, ci, co):
-        super().__init__()
-        self.identity = nn.Sequential(
-            Conv2d(ci=ci, co=co, k=2, s=2, p=0),
-            nn.BatchNorm2d(co)
-        )
-        self.residual = nn.Sequential(
-            Conv2d(ci=ci, co=co, k=4, s=2, p=1),
-            nn.BatchNorm2d(co),
-            nn.ReLU(),
-            Conv2d(ci=co, co=co, k=3, s=1, p=1),
-            nn.BatchNorm2d(co),
-        )
-        self.relu = nn.ReLU()
-
-    def forward(self, x):
-        r = self.residual(x)
-        i = self.identity(x)
-        x = r + i
-        x = self.relu(x)
-        return x
-
-
-class InverseResidualEncoder(nn.Module, ABC):
-
-    def __init__(self):
-        super().__init__()
-        self.encoder = nn.Sequential(
-            # Use just a convolutional layer for the first layer
-            InvResBlock(ci=3, co=32, ri=64, k=3, expand=False, squeeze=False),
-            InvResBlock(ci=32, co=64, ri=64, k=3, expand=False,
-                        downsample=True),
-            InvResBlock(ci=64, co=96, ri=32, k=5, downsample=True),
-            InvResBlock(ci=96, co=128, ri=16, k=3, downsample=True),
-            InvResBlock(ci=128, co=256, ri=8, k=5, downsample=True),
-            InvResBlock(ci=256, co=512, ri=4, k=3, downsample=True),
-            InvResBlock(ci=512, co=1024, ri=2, k=3, downsample=True),
-        )
-
-    def forward(self, x):
-        return self.encoder(x)

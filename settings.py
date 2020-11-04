@@ -53,8 +53,7 @@ if RUNNING_ON_DESKTOP:
         preview=False,
         load_design=False,
         save_design=True,
-        path='C:/Users/Dennis/Documents/desktop_resnet_output/' +
-             Log.date_time(),
+        path='C:/Users/Dennis/Documents/desktop_resnet_output/',
         save_lossplot=True,
         save_preview=True,
     )
@@ -69,7 +68,7 @@ else:
     dataset = Dataset.Settings(
         file='dataset_sar.zip',
         # file='dataset_msf.zip',
-        max_samples=MAX_SAMPLES,
+        max_samples=MAX_SAMPLES // 30,
         train_pct=90,
         n_subsets=1000,
         shuffle_train=True,
@@ -82,7 +81,7 @@ else:
         save_log=True,
     )
 
-    dropout_rate = 0.5
+    dropout_rate = 0.4
 
     # log the timer or not
     log_timer = False
@@ -95,13 +94,13 @@ else:
 
     # settings learning-rate tuner
     # beta1s = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.999]
-    epochs = 20
+    epochs = 1
 
     # progress logging settings
     progress = Progress.Settings(
         save_design=True,
         load_design=False,
-        path='/home/tue/s111167/trained_models/' + Log.date_time(),
+        path='/home/tue/s111167/trained_models/',
         save_lossplot=True,
         save_preview=True,
     )

@@ -31,25 +31,34 @@ else:
     n_gpus = parser.parse_args().n_gpus
 
 # ----------------------------------- MISC ---------------------------------- #
-# models to be run
-# modelname = ['ResNetAE1', 'ConvAE1', 'DenseAE1'][job_id]
-# modelname = 'ResNetAE2'
-# modelname = 'ConvAE2'
-# modelname = 'ConvUNet'
-# modelname = 'ConvUNet2'
-# modelname = 'ResUNet'
-# modelname = 'SarNetRNcSe'
-modelname = 'SarNetRSc'
 
-# learning_rates = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
-learning_rates = [1e-4, 1e-5, 1e-6]
-lr = learning_rates[job_id]
-# lr = 1e-6
+# choose learning rate & model, based on job & partition id
+learning_rates = [1e-5, 1e-6, 1e-7, 1e-8]
+for job_id in range(2*4):
+    partition_id = 3
+
+    if partition_id == 2:
+        modelname = ['SarNetLN',
+                     'SarNetLS',
+                     'SarNetCN',
+                     'SarNetCS',
+                     'SarNetRN',
+                     'SarNetRS'][job_id//4]
+        lr = learning_rates[job_id % 4]
+    elif partition_id == 3:
+        modelname = ['SarNetRNSE', 'SarNetRSSE'][job_id//4]
+        lr = learning_rates[job_id % 4]
+    else:
+        raise ValueError('invalid partition id')
+
+    print(modelname, lr)
+exit()
+
 
 # set/create root path from modelname
-settings.progress.path = str(settings.progress.path) + '/' + modelname
-if not Path(settings.progress.path.rsplit('/', 1)[0]).exists():
-    Path(settings.progress.path.rsplit('/', 1)[0]).mkdir()
+settings.progress.path = ('%s/%s_j%i_s%i_d%s' %
+                          (str(settings.progress.path), modelname, job_id,
+                           partition_id, Log.date_time()))
 if not Path(settings.progress.path).exists():
     Path(settings.progress.path).mkdir()
 

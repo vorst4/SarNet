@@ -117,7 +117,8 @@ class Design:
             nv.append(len(dlv.dataset))
 
         # number of parameters
-        n_par = sum(p.numel() for p in self._model.parameters())
+        n_par = sum(p.numel() for p in self._model.parameters() if
+                    p.requires_grad)
 
         # abbreviate format_number function & train_pct
         f = self._log.format_num
