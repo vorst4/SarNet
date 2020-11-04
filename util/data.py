@@ -261,10 +261,10 @@ class Dataset:
         dataloaders_valid = []
         for ds_t, ds_v in zip(dataset_train, dataset_valid):
             dataloaders_train.append(
-                DataLoader(ds_t, settings.batch_size)
+                DataLoader(ds_t, settings.batch_size, shuffle=True)
             )
             dataloaders_valid.append(
-                DataLoader(ds_v, settings.batch_size)
+                DataLoader(ds_v, settings.batch_size, shuffle=True)
             )
 
         # ATTRIBUTES
