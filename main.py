@@ -38,11 +38,13 @@ else:
 # modelname = 'ConvUNet'
 # modelname = 'ConvUNet2'
 # modelname = 'ResUNet'
-modelname = 'SarNetRNcSe'
+# modelname = 'SarNetRNcSe'
+modelname = 'SarNetRSc'
 
 # learning_rates = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
-# lr = learning_rates[job_id]
-lr = 1e-6
+learning_rates = [1e-4, 1e-5, 1e-6]
+lr = learning_rates[job_id]
+# lr = 1e-6
 
 # set/create root path from modelname
 settings.progress.path = str(settings.progress.path) + '/' + modelname

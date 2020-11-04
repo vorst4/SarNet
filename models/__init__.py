@@ -12,3 +12,4 @@ from .resunet import ResUNet
 from .convunet2 import ConvUNet2
 from .sarnet_r_nc import SarNetRNc
 from .sarnet_r_nc_se import SarNetRNcSe
+from .sarnet_r_sc import SarNetRSc
