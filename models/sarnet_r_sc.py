@@ -52,14 +52,14 @@ class Down(nn.Module, ABC):
     def __init__(self, ci, co, ri, sq=False, ex=False):
         super().__init__()
         d = settings.dropout_rate
+        self.down = ConvBnHs(ci=ci, co=ci)
         self.res = blk.InvResBlock(ci=ci, co=co, k=3, dropout=d,
-                                   ri=ri,
+                                   ri=ri // 2,
                                    expand=ex,
                                    squeeze=sq)
-        self.down = ConvBnHs(ci=co, co=co)
 
     def forward(self, x):
-        return self.down(self.res(x))
+        return self.res(self.down(x))
 
 
 class Up(nn.Module, ABC):
@@ -94,14 +94,18 @@ class SarNetRSc(nn.Module, ABC):
         r = settings.IMG_RESOLUTION  # resolution input
         ni_meta = 24  # number of meta-data input variables
         d = settings.dropout_rate
+
+        # encoder
+        self.enc1 = blk.InvResBlock(ci=3, co=c // 32, k=3, dropout=d,
+                                    ri=r,
+                                    expand=False,
+                                    squeeze=False)
         # 32 --> 16
-        self.enc1 = Down(ci=3, co=c // 32, sq=False, ex=False, ri=r)
+        self.enc2 = Down(ci=c // 32, co=c // 32, sq=False, ex=False, ri=r)
         # 16 --> 8
-        self.enc2 = Down(ci=c // 32, co=c // 16, ri=r // 2)
+        self.enc3 = Down(ci=c // 32, co=c // 8, ri=r // 2)
         # 8 --> 4
-        self.enc3 = Down(ci=c // 16, co=c // 8, ri=r // 4)
-        self.enc4 = blk.InvResBlock(ci=c // 8, co=c // 4, k=3, dropout=d,
-                                    ri=r // 8)
+        self.enc4 = Down(ci=c // 8, co=c // 4, ri=r // 4)
         # 4 --> 1
         self.enc5 = ConvBnHs(ci=c // 4, co=c - ni_meta, k=4, s=1)
 
@@ -109,23 +113,25 @@ class SarNetRSc(nn.Module, ABC):
         # 1 --> 4
         self.dec1 = ConvBnHs(ci=c, co=c // 4, k=4, s=1, t=True)
         # 4 --> 8
-        self.dec2 = Up(ci=c // 4, co=c // 8, ri=r // 8)
+        self.dec2 = Up(ci=c // 4 * 2, co=c // 8, ri=r // 8)
         # 8 --> 16
-        self.dec3 = Up(ci=c // 8, co=c // 16, ri=r // 4)
+        self.dec3 = Up(ci=c // 8 * 2, co=c // 32, ri=r // 4)
         # 16 --> 32
-        self.dec4 = Up(ci=c // 16, co=c // 32, ri=r // 2, mode='bicubic')
-        self.dec5 = blk.InvResBlock(co=c // 32, k=3, dropout=d,
+        self.dec4 = Up(ci=c // 32 * 2, co=c // 32, ri=r // 2, mode='bicubic')
+        self.dec5 = blk.InvResBlock(ci=c // 32 * 2,
+                                    co=c // 32, k=3,
+                                    dropout=d,
                                     squeeze=False, expand=False)
         self.dec6 = blk.Conv2d(co=1, k=3, p=1, bias=True)
 
     def forward(self, input_img, input_meta):
         # encoder
         x = input_img
-        x = self.enc1(x)
-        x = self.enc2(x)
-        x = self.enc3(x)
-        x = self.enc4(x)
-        x = self.enc5(x)
+        x1 = self.enc1(x)
+        x2 = self.enc2(x1)
+        x3 = self.enc3(x2)
+        x4 = self.enc4(x3)
+        x = self.enc5(x4)
 
         # bottleneck
         n = x.shape[0]
@@ -133,10 +139,10 @@ class SarNetRSc(nn.Module, ABC):
 
         # decoder
         x = self.dec1(x)
-        x = self.dec2(x)
-        x = self.dec3(x)
-        x = self.dec4(x)
-        x = self.dec5(x)
+        x = self.dec2(torch.cat([x, x4], dim=1))
+        x = self.dec3(torch.cat([x, x3], dim=1))
+        x = self.dec4(torch.cat([x, x2], dim=1))
+        x = self.dec5(torch.cat([x, x1], dim=1))
         x = self.dec6(x)
 
         return x
