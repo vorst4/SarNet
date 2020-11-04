@@ -4,6 +4,8 @@ from datetime import datetime
 from pathlib import Path
 
 import psutil
+from typing import Optional
+from util.base_obj import BaseObj
 
 
 class Log:
@@ -14,22 +16,31 @@ class Log:
     logfile.
     """
 
-    class Settings:
+    class Settings(BaseObj):
         def __init__(self,
                      directory: [Path, str, None],
                      save_log: bool = False,
                      filename_prefix: str = 'log_'):
+            super().__init__(indent=' ' * 2)
             self.directory = directory
             self.save_log = save_log
             self.filename_prefix = filename_prefix
 
-    def __init__(self, settings: [Settings, None]):
+    def __init__(self, settings: Optional[Settings],
+                 job_id: int = None,
+                 server_id: int = None,
+                 n_cpus: int = None,
+                 n_gpus: int = None):
 
         # use default settings if None is given
         settings = self.Settings(None) if settings is None else settings
 
-        # ATTRIBUTE
+        # ATTRIBUTES
         self.settings = settings
+        self.job_id = job_id
+        self.server_id = server_id
+        self.n_cpus = n_cpus
+        self.n_gpus = n_gpus
 
         # skip initialization if log does not have to be saved
         if not settings.save_log:
@@ -57,12 +68,19 @@ class Log:
         self.log = log
 
         # create file
-        self('log created')
+        self('log created \n%s' % self.info(indent='  '))
 
         # sanity check that it now exists
         if not self.log.exists():
             raise Exception('ERROR: could not create log file, '
                             'check permissions')
+
+    def info(self, indent: str = ''):
+        s = indent + 'job_id: %i\n' % self.job_id
+        s += indent + 'server_id: %i\n' % self.server_id
+        s += indent + 'n_cpus: %i\n' % self.n_cpus
+        s += indent + 'n_gpus: %i' % self.n_gpus
+        return s
 
     @staticmethod
     def _timestamp() -> str:

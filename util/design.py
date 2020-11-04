@@ -3,8 +3,7 @@ import json
 import os
 from pathlib import Path
 from util.timer import Timer
-from typing import Union, List, Tuple
-
+from typing import Union, List, Tuple, Optional
 
 import torch
 import torch.nn as nn
@@ -67,13 +66,13 @@ class Design:
         self._loss_function = None
         self._optimizer = None
         self._lr_sched = None
-        self._log = Log(None)
+        self._log: Optional[Log] = None
         self._epoch_start = -1
         self.epoch_current = -1.
         self._epoch_stop = -1
-        self._timer = Timer(None)
-        self.performance = Performance(None)
-        self._mse_per_sample = MsePerSample(None)
+        self._timer: Optional[Timer] = None
+        self.performance: Optional[Performance] = None
+        self._mse_per_sample: Optional[MsePerSample] = None
         torch.manual_seed(self._torch_seed)
 
     def create(self,
@@ -148,7 +147,7 @@ class Design:
         """
         return self._epoch_stop
 
-    def get_epoch_current(self) -> int:
+    def get_epoch_current(self) -> float:
         """
         Get epoch at which the training stops
         """
@@ -230,9 +229,15 @@ class Design:
         self._epoch_stop = epoch_stop
 
         # allocate space for the performance parameters
-        self.performance.mse_train.allocate(epoch_stop * settings.n_subsets)
-        self.performance.mse_valid.allocate(epoch_stop * settings.n_subsets)
-        self.performance.loss_valid.allocate(epoch_stop * settings.n_subsets)
+        self.performance.mse_train.allocate(
+            epoch_stop * settings.dataset.n_subsets
+        )
+        self.performance.mse_valid.allocate(
+            epoch_stop * settings.dataset.n_subsets
+        )
+        self.performance.loss_valid.allocate(
+            epoch_stop * settings.dataset.n_subsets
+        )
 
     def save(self, path, name=None, backups: List[Path] = None):
         """

@@ -42,65 +42,75 @@ class ConvBnHs(nn.Module, ABC):
         self.hs = nn.Hardswish()
 
     def forward(self, x):
-        return self.hs(self.bn(self.conv(x)))
+        # return self.hs(self.bn(self.conv(x)))
+        return self.conv(x)
 
 
-class ResNetAE3(nn.Module, ABC):
+class Down(nn.Module, ABC):
+
+    def __init__(self, ci, co):
+        super().__init__()
+        d = settings.dropout_rate
+        self.res = blk.InvResBlock(ci=ci, co=co, k=3, dropout=d,
+                                   expand=False,
+                                   squeeze=False)
+        self.down = ConvBnHs(ci=co, co=co)
+
+    def forward(self, x):
+        return self.down(self.res(x))
+
+
+class Up(nn.Module, ABC):
+
+    def __init__(self, ci, co, mode='transpose', r=None):
+        super().__init__()
+        d = settings.dropout_rate
+        self.res = blk.InvResBlock(ci=ci, co=co, k=3, dropout=d,
+                                   expand=False,
+                                   squeeze=False)
+        if mode is 'transpose':
+            self.up = ConvBnHs(ci=co, co=co, t=True)
+        elif mode is 'bicubic':
+            assert r is not None, 'resolution output (r) must be provided'
+            self.up = nn.Upsample(size=(r, r),
+                                  mode='bicubic',
+                                  align_corners=False)
+        else:
+            raise ValueError('invalid mode, can only be tranpose or bicubic')
+
+    def forward(self, x):
+        return self.up(self.res(x))
+
+
+class SarNetRNc(nn.Module, ABC):
     lr_ideal = 1e-5
 
     def __init__(self):
         super().__init__()
 
         c = 1024  # channels
-        ri = settings.IMG_RESOLUTION  # resolution input
+        r = settings.IMG_RESOLUTION  # resolution input
         ni_meta = 24  # number of meta-data input variables
         d = settings.dropout_rate
 
-        self.enc1 = blk.InvResBlock(co=c // 32, k=3,
-                                    dropout=d,
+        self.enc1 = Down(ci=3, co=c // 32)  # 32 --> 16
+        self.enc2 = Down(ci=c // 32, co=c // 16)  # 16 --> 8
+        self.enc3 = Down(ci=c // 16, co=c // 8)  # 8 --> 4
+        self.enc4 = blk.InvResBlock(ci=c // 8, co=c // 4, k=3, dropout=d,
                                     expand=False,
                                     squeeze=False)
-        self.enc2 = ConvBnHs(ci=c // 32, co=c // 32)  # 32 --> 16
-        self.enc3 = blk.InvResBlock(co=c // 16, k=3,
-                                    dropout=d,
-                                    expand=False,
-                                    squeeze=False)
-        self.enc4 = ConvBnHs(ci=c // 16, co=c // 16)  # 16 --> 8
-        self.enc5 = blk.InvResBlock(co=c // 8, k=3,
-                                    dropout=d,
-                                    expand=False,
-                                    squeeze=False)
-        self.enc6 = ConvBnHs(ci=c // 8, co=c // 8)  # 8 --> 4
-        self.enc7 = blk.InvResBlock(co=c // 4, k=3,
-                                    dropout=d,
-                                    expand=False,
-                                    squeeze=False)
-        self.enc8 = ConvBnHs(ci=c // 4, co=c - ni_meta, k=4, s=1)  # 4 --> 1
+        self.enc5 = ConvBnHs(ci=c // 4, co=c - ni_meta, k=4, s=1)  # 4 --> 1
 
         # decoder
         self.dec1 = ConvBnHs(ci=c, co=c // 4, k=4, s=1, t=True)  # 1 --> 4
-        self.dec2 = blk.InvResBlock(ci=c // 4, co=c // 8, k=3,
+        self.dec2 = Up(ci=c // 4, co=c // 8)  # 4 --> 8
+        self.dec3 = Up(ci=c // 8, co=c // 16)  # 8 --> 16
+        self.dec4 = Up(ci=c // 16, co=c // 32, mode='bicubic', r=r)  # 16 -> 32
+        self.dec5 = blk.InvResBlock(co=c // 32, k=3,
                                     dropout=d,
                                     expand=False,
                                     squeeze=False)
-        self.dec3 = ConvBnHs(ci=c // 8, co=c // 8, t=True)  # 4 --> 8
-        self.dec4 = blk.InvResBlock(co=c // 16, k=3,
-                                    dropout=d,
-                                    expand=False,
-                                    squeeze=False)
-        self.dec5 = ConvBnHs(ci=c // 16, co=c // 16, t=True)  # 8 --> 16
-        self.dec6 = blk.InvResBlock(co=c // 32, k=3,
-                                    dropout=d,
-                                    expand=False,
-                                    squeeze=False)
-        self.dec7 = nn.Upsample(size=(ri, ri),
-                                mode='bicubic',
-                                align_corners=False)  # 16 --> 32
-        self.dec8 = blk.InvResBlock(co=c // 32, k=3,
-                                    dropout=d,
-                                    expand=False,
-                                    squeeze=False)
-        self.dec9 = blk.Conv2d(co=1, k=3, p=1, bias=True)
+        self.dec6 = blk.Conv2d(co=1, k=3, p=1, bias=True)
 
     def forward(self, input_img, input_meta):
         # encoder
@@ -110,9 +120,6 @@ class ResNetAE3(nn.Module, ABC):
         x = self.enc3(x)
         x = self.enc4(x)
         x = self.enc5(x)
-        x = self.enc6(x)
-        x = self.enc7(x)
-        x = self.enc8(x)
 
         # bottleneck
         n = x.shape[0]
@@ -125,8 +132,5 @@ class ResNetAE3(nn.Module, ABC):
         x = self.dec4(x)
         x = self.dec5(x)
         x = self.dec6(x)
-        x = self.dec7(x)
-        x = self.dec8(x)
-        x = self.dec9(x)
 
         return x

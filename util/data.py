@@ -20,6 +20,7 @@ from PIL import Image
 from zipfile import ZipFile
 from util.timer import Timer
 from util.log import Log
+from util.base_obj import BaseObj
 from torch.utils.data import DataLoader
 
 N_ANTENNAS = 12  # todo: don't hardcode this
@@ -101,7 +102,7 @@ class Dataset:
 
     ANGLES = tuple(torch.arange(0, 360, 30))
 
-    class Settings:
+    class Settings(BaseObj):
         def __init__(self,
                      file: Union[str, Path],
                      img_resolution: int = 32,
@@ -133,6 +134,7 @@ class Dataset:
                 not, call method 'shuffle()' the shuffle the set
             :param csv_delimiter: delimiter used in csv file
             """
+            super().__init__(indent=' ' * 2)
 
             # if none is given as max_samples, count the number of samples
             #   present in the dataset. Note that this is pretty slow

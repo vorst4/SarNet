@@ -37,7 +37,7 @@ if RUNNING_ON_DESKTOP:
     log_timer = False
 
     # batch size (int)
-    batch_size = 8
+    batch_size = 128
 
     # batch normalisation settings
     batch_norm = {'momentum': 0.99, 'eps': 1e-3}
@@ -105,3 +105,18 @@ else:
         save_lossplot=True,
         save_preview=True,
     )
+
+
+def info(indent: str = ' ' * 2):
+    s = ''
+    for key, att in globals().items():
+        if (
+                key[0] != '_'
+                and 'module' not in str(att)
+                and 'class' not in str(att)
+                and 'function' not in str(att)
+        ):
+            s += '\n%s%s: %s' % (indent, key, str(att).replace('\n',
+                                                               '\n'+indent))
+
+    return s[1:]

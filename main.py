@@ -38,10 +38,11 @@ else:
 # modelname = 'ConvUNet'
 # modelname = 'ConvUNet2'
 # modelname = 'ResUNet'
-modelname = 'ResNetAE3'
+modelname = 'SarNetRNcSe'
 
-learning_rates = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
-lr = learning_rates[job_id]
+# learning_rates = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
+# lr = learning_rates[job_id]
+lr = 1e-6
 
 # set/create root path from modelname
 settings.progress.path = str(settings.progress.path) + '/' + modelname
@@ -54,8 +55,11 @@ if not Path(settings.progress.path).exists():
 if settings.log.directory is None:
     settings.log.directory = str(settings.progress.path)
 settings.log.filename_prefix += modelname + '_'
-print(settings.log.filename_prefix)
-log = Log(settings.log)
+log = Log(settings.log, job_id=job_id, server_id=partition_id,
+          n_cpus=n_cpus, n_gpus=n_gpus)
+
+# log settings
+log('settings:\n' + settings.info())
 
 # print memory usage
 log('memory usage (cpu): ' + log.cpu_memory_usage())
@@ -86,7 +90,7 @@ ds = Dataset(settings.dataset,
              # trans_train=trans_train,  # todo: check if these are correct
              # trans_val=trans_val  # todo: check if these are correct
              )
-log('dataset file: %s' % str(ds.settings.file))
+log('  dataset file: %s' % str(ds.settings.file))
 dls_train, dls_valid = ds.dataloaders_train, ds.dataloaders_valid
 timer.stop('created dataset')
 

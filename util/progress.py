@@ -4,6 +4,7 @@ from typing import Union, TYPE_CHECKING
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
+from util.base_obj import BaseObj
 from PIL import Image
 
 from .log import Log
@@ -29,7 +30,7 @@ class Progress:
     IDX_PREVIEW = 1
 
     @staticmethod
-    class Settings:
+    class Settings(BaseObj):
         def __init__(self,
                      print_: bool = True,
                      lossplot: bool = False,
@@ -88,6 +89,7 @@ class Progress:
             :param figure_size: the size of the lossplot and preview that
                 are generated
             """
+            super().__init__(indent=' ' * 2)
             self.print = print_
             self.lossplot = lossplot
             self.preview = preview
@@ -108,15 +110,6 @@ class Progress:
             self.preview_padding = preview_padding
             self.preview_padding_set = preview_padding_set
             self.figure_size = figure_size
-
-        def __str__(self):
-            s = '-' * 69 + '\n'
-            s += repr(self) + '\n'
-            for att in dir(self):
-                if att[0] != '_':
-                    s += '  ' + att + ' = ' + repr(getattr(self, att)) + '\n'
-            s = '-' * 69 + '\n'
-            return s
 
     def __init__(self,
                  settings: Settings,
