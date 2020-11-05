@@ -281,7 +281,6 @@ class Dataset:
         self.dataloaders_train: List[DataLoader] = dataloaders_train
         self.dataloaders_valid: List[DataLoader] = dataloaders_valid
 
-        self.shuffle()  # todo: delete
 
     def _generate_indices(self):
         """
