@@ -38,6 +38,8 @@ class _SarNetL(nn.Module, ABC):
 
 
 class SarNetLN(_SarNetL, ABC):
+    lr_ideal = 1e-5
+
     def __init__(self):
         super().__init__(False)
 
@@ -60,6 +62,8 @@ class SarNetLN(_SarNetL, ABC):
 
 
 class SarNetLS(_SarNetL, ABC):
+    lr_ideal = 1e-5
+
     def __init__(self):
         super().__init__(True)
 

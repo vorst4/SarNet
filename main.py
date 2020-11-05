@@ -33,20 +33,15 @@ else:
 # ----------------------------------- MISC ---------------------------------- #
 
 # choose learning rate & model, based on job & partition id
-learning_rates = [1e-5, 1e-6, 1e-7, 1e-8]
-if partition_id == 2:
-    modelname = ['SarNetLN',
-                 'SarNetLS',
-                 'SarNetCN',
-                 'SarNetCS',
-                 'SarNetRN',
-                 'SarNetRS'][job_id//4]
-    lr = learning_rates[job_id % 4]
-elif partition_id == 3:
-    modelname = ['SarNetRNSE', 'SarNetRSSE'][job_id//4]
-    lr = learning_rates[job_id % 4]
-else:
-    raise ValueError('invalid partition id')
+lr = 1e-4
+modelname = ['SarNetLN',
+             'SarNetLS',
+             'SarNetCN',
+             'SarNetCS',
+             'SarNetRN',
+             'SarNetRS',
+             'SarNetRNSE',
+             'SarNetRSSE'][job_id]
 
 
 # set/create root path from modelname

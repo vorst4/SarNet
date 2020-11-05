@@ -110,6 +110,8 @@ class _Up(nn.Module, ABC):
 
 
 class SarNetCS(_SarNetC, ABC):
+    lr_ideal = 1e-6  # 1e-5 is also stable
+
     def __init__(self):
         super().__init__(skip=True)
 
@@ -138,6 +140,8 @@ class SarNetCS(_SarNetC, ABC):
 
 
 class SarNetCN(_SarNetC, ABC):
+    lr_ideal = 1e-6  # 1e-5 is also stable
+
     def __init__(self):
         super().__init__(skip=False)
 

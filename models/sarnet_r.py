@@ -137,6 +137,8 @@ class _SarNetR(nn.Module, ABC):
 
 
 class SarNetRS(_SarNetR, ABC):
+    lr_ideal = 1e-5
+
     def __init__(self, sq=False, ex=False):
         super().__init__(skip=True, sq=sq, ex=ex)
 
@@ -163,6 +165,8 @@ class SarNetRS(_SarNetR, ABC):
 
 
 class SarNetRN(_SarNetR, ABC):
+    lr_ideal = 1e-5
+
     def __init__(self, sq=False, ex=False):
         super().__init__(skip=False, sq=sq, ex=ex)
 
@@ -180,10 +184,14 @@ class SarNetRN(_SarNetR, ABC):
 
 
 class SarNetRSSE(SarNetRS, ABC):
+    lr_ideal = 1e-5
+
     def __init__(self):
         super().__init__(sq=True, ex=True)
 
 
 class SarNetRNSE(SarNetRN, ABC):
+    lr_ideal = 1e-5
+
     def __init__(self):
         super().__init__(sq=True, ex=True)
