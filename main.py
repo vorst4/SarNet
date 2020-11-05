@@ -45,9 +45,9 @@ modelname = ['SarNetLN',
 
 
 # set/create root path from modelname
-settings.progress.path = ('%s/%s_j%i_s%i_d%s' %
-                          (str(settings.progress.path), modelname, job_id,
-                           partition_id, Log.date_time()))
+settings.progress.path = ('%s/%s_d%s_s%i_j%i' %
+                          (str(settings.progress.path), modelname,
+                           Log.date_time(), partition_id, job_id))
 if not Path(settings.progress.path).exists():
     Path(settings.progress.path).mkdir()
 
