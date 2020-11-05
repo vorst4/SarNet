@@ -22,6 +22,7 @@ from util.timer import Timer
 from util.log import Log
 from util.base_obj import BaseObj
 from torch.utils.data import DataLoader
+from dataclasses import dataclass
 
 N_ANTENNAS = 12  # todo: don't hardcode this
 
@@ -241,25 +242,34 @@ class Dataset:
             trans_valid = Forward()
 
         # determine ids for validation/training dataset
-        ids_train = np.arange(0, int(n_samples * settings.train_pct / 100))
-        ids_valid = np.arange(int(n_samples * settings.train_pct / 100),
-                              n_samples)
+        # n_train = int(n_samples * settings.train_pct / 100)
+        # ids_train = torch.arange(0, n_train, dtype=torch.int32)
+        # ids_valid = torch.arange(n_train, n_samples, dtype=torch.int32)
+        # ids_train = np.arange(0, int(n_samples * settings.train_pct / 100))
+        # ids_valid = np.arange(int(n_samples * settings.train_pct / 100),
+        #                       n_samples)
 
-        # determine ids of training/validation subsets, and shuffle them
-        ids_train_subset = np.array_split(ids_train, settings.n_subsets)
-        ids_valid_subset = np.array_split(ids_valid, settings.n_subsets)
+        # ids_train_subset = torch.split(ids.train, settings.n_subsets)
+        # ids_valid_subset = torch.split(ids.train, settings.n_subsets)
 
-        # create validation/training datasets
-        dataset_train = []
-        dataset_valid = []
-        for ids_t, ids_v in zip(ids_train_subset, ids_valid_subset):
-            dataset_train.append(_Subset(self, ids_t, trans_train))
-            dataset_valid.append(_Subset(self, ids_v, trans_valid))
+        # create train/valid subsets
+        ds_train = []
+        ds_valid = []
+        for idx_subset in range(settings.n_subsets):
+            ds_train.append(_Subset(self, 'train', idx_subset, trans_train))
+            ds_valid.append(_Subset(self, 'valid', idx_subset, trans_valid))
+
+        # ATTRIBUTES
+        self.settings = settings
+        self.dataset = dataset
+        self._n_train = int(n_samples * settings.train_pct / 100)
+        self._n_samples = n_samples
+        self.indices = self._generate_indices()
 
         # create training/validation dataloaders
         dataloaders_train = []
         dataloaders_valid = []
-        for ds_t, ds_v in zip(dataset_train, dataset_valid):
+        for ds_t, ds_v in zip(ds_train, ds_valid):
             dataloaders_train.append(
                 DataLoader(ds_t, settings.batch_size, shuffle=True)
             )
@@ -268,28 +278,42 @@ class Dataset:
             )
 
         # ATTRIBUTES
-        self.settings = settings
-        self.dataset = dataset
         self.dataloaders_train: List[DataLoader] = dataloaders_train
         self.dataloaders_valid: List[DataLoader] = dataloaders_valid
-        self._n_samples = n_samples
-        self._ids_train = ids_train
-        self._ids_valid = ids_valid
 
-        # shuffle training/validation dataset
-        self.shuffle()
+        self.shuffle()  # todo: delete
+
+    def _generate_indices(self):
+        """
+        This method uses the first 'n_train' number of samples from the
+        dataset as the training set, and the remaining number of samples as
+        the validation set. These indices are then shuffled (note: they are
+        shuffled INDEPENDENTLY for the train/valid set), then each set is
+        split further into subsets.
+        """
+
+        # generate ids for train/valid set
+        #   use the first n_train for the training set, and the remaining
+        #   ones for the validation set
+        ids_train = np.arange(0, self._n_train)
+        ids_valid = np.arange(self._n_train, self._n_samples)
+
+        # shuffle them if desired (shuffle is done inplace)
+        if self.settings.shuffle_train:
+            np.random.shuffle(ids_train)
+        if self.settings.shuffle_valid:
+            np.random.shuffle(ids_valid)
+
+        return {
+            'train': np.array_split(ids_train, self.settings.n_subsets),
+            'valid': np.array_split(ids_valid, self.settings.n_subsets)
+        }
 
     def shuffle(self):
         """
-        This function shuffles the WHOLE training/validation dataset,
-        NOT each individual training/validation subset.
-
-        NOTE: the training/validation dataset are still kept separate.
+        Simply generate new random indices to shuffle them
         """
-        if self.settings.shuffle_train:
-            np.random.shuffle(self._ids_train)
-        if self.settings.shuffle_valid:
-            np.random.shuffle(self._ids_valid)
+        self.indices = self._generate_indices()
 
     def get(self, idx):
         ds = self.dataset
@@ -313,16 +337,19 @@ class _Subset(torch.utils.data.Dataset):
     KEY = KEY
     IDX = IDX
 
-    def __init__(self, dataset: Dataset, indices, transform):
+    def __init__(self, dataset: Dataset, stype, idx_subset, transform):
         self.dataset = dataset
-        self.indices = indices
+        self.stype = stype
+        self.idx_subset = idx_subset
         self.transform = transform
 
     def __getitem__(self, idx):
-        return self.transform(self.dataset.get(self.indices[idx]))
+        return self.transform(self.dataset.get(
+            self.dataset.indices[self.stype][self.idx_subset][idx])
+        )
 
     def __len__(self):
-        return len(self.indices)
+        return len(self.dataset.indices[self.stype][self.idx_subset])
 
 
 class Forward:
