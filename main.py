@@ -11,8 +11,6 @@ from util.design import Design
 from util.log import Log
 from util.timer import Timer
 
-print('START')
-
 # -------------------------------- ARGUMENTS -------------------------------- #
 # On the server, several parameters should be passed when running the
 # script, this is not necessary when running it on the desktop
@@ -32,7 +30,6 @@ else:
     n_cpus = parser.parse_args().n_cpus
     n_gpus = parser.parse_args().n_gpus
 
-print('PARSED ARGUMENTS')
 # ----------------------------------- MISC ---------------------------------- #
 
 # choose learning rate & model, based on job & partition id
@@ -46,17 +43,13 @@ modelname = ['SarNetLN',
              'SarNetRNSE',
              'SarNetRSSE'][job_id]
 
-print('DEFINED MODELNAME AND LR %s, %s' % (modelname, str(lr)))
-
 # set/create root path from modelname
 settings.progress.path = str(Path(str(settings.progress.path)).joinpath(
-    '%s_d%s_s%i_j%i' % (modelname, Log.date_time(), partition_id, job_id)
+    '%s_%s_d%s_s%i_j%i' % (settings.ds, modelname, Log.date_time(),
+                           partition_id, job_id)
 ))
-print('DEFINED PROGRESS PATH %s' % settings.progress.path)
-exit()
 if not Path(settings.progress.path).exists():
     Path(settings.progress.path).mkdir()
-print('CREATED PROGRESS PATH DIR')
 
 # initialize log
 if settings.log.directory is None:

@@ -15,9 +15,11 @@ if RUNNING_ON_DESKTOP:
 
     MAX_SAMPLES = 70399
 
+    ds = 'sar'  # either 'sar' or 'msf'
+
     # dataset settings
     dataset = Dataset.Settings(
-        file='dataset_sar.zip',
+        file='dataset_' + ds + '.zip',
         # file='dataset_msf.zip',
         max_samples=1000,
         train_pct=90,
@@ -64,9 +66,11 @@ else:
 
     MAX_SAMPLES = 10236800
 
+    ds = 'sar'
+
     # dataset
     dataset = Dataset.Settings(
-        file='dataset_sar.zip',
+        file='dataset_' + ds + '.zip',
         # file='dataset_msf.zip',
         max_samples=MAX_SAMPLES // 30,
         train_pct=90,
@@ -116,6 +120,6 @@ def info(indent: str = ' ' * 2):
                 and 'function' not in str(att)
         ):
             s += '\n%s%s: %s' % (indent, key, str(att).replace('\n',
-                                                               '\n'+indent))
+                                                               '\n' + indent))
 
     return s[1:]
