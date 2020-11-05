@@ -33,7 +33,7 @@ else:
 # ----------------------------------- MISC ---------------------------------- #
 
 # choose learning rate & model, based on job & partition id
-lr = 1e-4
+lr = 1e-5
 modelname = ['SarNetLN',
              'SarNetLS',
              'SarNetCN',
