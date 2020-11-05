@@ -22,7 +22,6 @@ from util.timer import Timer
 from util.log import Log
 from util.base_obj import BaseObj
 from torch.utils.data import DataLoader
-from dataclasses import dataclass
 
 N_ANTENNAS = 12  # todo: don't hardcode this
 
