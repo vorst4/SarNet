@@ -20,7 +20,7 @@ class _SarNetC(nn.Module, ABC):
         super().__init__()
 
         a = 2 if skip else 1
-        c = 1024
+        c = int(1024 * 1.5)
         r = settings.IMG_RESOLUTION  # resolution input
         n_meta = 24  # number of meta-data input variables
         dr = settings.dropout_rate
@@ -28,10 +28,8 @@ class _SarNetC(nn.Module, ABC):
         self.encoder = nn.Sequential(
             # start
             nn.Sequential(
-                blk.ConvBnHs(ci=3, co=c // 32, k=3, s=1, p=1),
-                blk.ConvBnHs(ci=c // 32, co=c // 32, k=3, s=1, p=1),
-                nn.Dropout2d(p=dr),
-                nn.Hardswish(),
+                blk.ConvBnHsDr(ci=3, co=c // 32, k=3, s=1, p=1, dr=dr),
+                blk.ConvBnHsDr(ci=c // 32, co=c // 32, k=3, s=1, p=1, dr=dr),
             ),
             # 32 -> 16
             _Down(c // 32, c // 16, dr=dr),
@@ -40,25 +38,23 @@ class _SarNetC(nn.Module, ABC):
             # 8 -> 4
             _Down(c // 8, c // 4, dr=dr),
             # 4 -> 1
-            blk.ConvBnHs(ci=c // 4, co=c - n_meta, k=4, s=1, p=0),
+            blk.ConvBnHsDr(ci=c // 4, co=c - n_meta, k=4, s=1, p=0, dr=dr),
         )
 
         self.decoder = nn.Sequential(
             # 1 -> 4
-            nn.ConvTranspose2d(
-                in_channels=c,
-                out_channels=c // 4,
-                kernel_size=4,
-                padding=0,
-                bias=False
-            ),
+            blk.ConvBnHsDr(ci=c, co=c//4, k=4, s=1, p=0, po=0, t=True, dr=dr),
             # 4 -> 8
             _Up(ci=c // 4 * a, co=c // 8, ri=r // 8, m='transpose', dr=dr),
+            # 8 -> 16
             _Up(ci=c // 8 * a, co=c // 16, ri=r // 4, m='transpose', dr=dr),
+            # 16 -> 32
             _Up(ci=c // 16 * a, co=c // 32, ri=r // 2, m='transpose', dr=dr),
+            # end
             nn.Sequential(
-                blk.ConvBnHs(ci=c // 32 * a, co=c // 32, k=3, s=1, p=1),
-                blk.ConvBnHs(ci=c // 32, co=c // 32, k=3, s=1, p=1),
+                blk.ConvBnHsDr(ci=c // 32 * a, co=c // 32, k=3, s=1, p=1,
+                               dr=dr),
+                blk.ConvBnHsDr(ci=c // 32, co=c // 32, k=3, s=1, p=1, dr=dr),
                 nn.Conv2d(in_channels=c // 32, out_channels=1, kernel_size=1),
             ),
         )
@@ -67,37 +63,26 @@ class _SarNetC(nn.Module, ABC):
 class _Down(nn.Module, ABC):
     def __init__(self, ci, co, dr):
         super().__init__()
-        self.down = nn.Conv2d(in_channels=ci,
-                              out_channels=ci,
-                              kernel_size=2,
-                              groups=ci,
-                              stride=2,
-                              bias=False)
-        self.conv1 = blk.ConvBnHs(ci=ci, co=co, k=3, s=1, p=1)
-        self.conv2 = blk.ConvBnHs(ci=co, co=co, k=3, s=1, p=1)
-        self.drp = nn.Dropout2d(p=dr)
+        self.down = blk.ConvBnHs(ci=ci, co=ci, k=2, g=ci, p=0, s=2)
+        self.conv1 = blk.ConvBnHsDr(ci=ci, co=co, k=3, s=1, p=1, dr=dr)
+        self.conv2 = blk.ConvBnHsDr(ci=co, co=co, k=3, s=1, p=1, dr=dr)
 
     def forward(self, x):
-        return self.drp(self.conv2(self.conv1(self.down(x))))
+        return self.conv2(self.conv1(self.down(x)))
 
 
 class _Up(nn.Module, ABC):
     def __init__(self, ci, co, ri, m, dr):
         super().__init__()
-        self.conv1 = blk.ConvBnHs(ci=ci, co=co, k=3, s=1, p=1)
-        self.conv2 = blk.ConvBnHs(ci=co, co=co, k=3, s=1, p=1)
+        self.conv1 = blk.ConvBnHsDr(ci=ci, co=co, k=3, s=1, p=1, dr=dr)
+        self.conv2 = blk.ConvBnHsDr(ci=co, co=co, k=3, s=1, p=1, dr=dr)
         self.up = self._get_up(co, ri, m)
-        self.drp = nn.Dropout2d(p=dr)
 
     @staticmethod
     def _get_up(co, ri, mode):
         if mode is 'transpose':
-            return nn.ConvTranspose2d(in_channels=co,
-                                      out_channels=co,
-                                      kernel_size=2,
-                                      groups=co,
-                                      stride=2,
-                                      bias=False)
+            return blk.ConvBnHs(ci=co, co=co, k=2, g=co, p=0, po=0, s=2,
+                                b=False, t=True)
         elif mode is 'bicubic':
             return nn.Upsample(size=(ri * 2, ri * 2),
                                mode='bicubic',
@@ -106,7 +91,7 @@ class _Up(nn.Module, ABC):
             raise ValueError('invalid mode, can only be tranpose or bicubic')
 
     def forward(self, x):
-        return self.drp(self.up(self.conv2(self.conv1(x))))
+        return self.up(self.conv2(self.conv1(x)))
 
 
 class SarNetCS(_SarNetC, ABC):

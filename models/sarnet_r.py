@@ -6,24 +6,88 @@ import torch
 from util.timer import Timer
 
 
+class _SarNetR(nn.Module, ABC):
+
+    def __init__(self, skip: bool, sq: bool, ex: bool):
+        super().__init__()
+
+        a = 2 if skip else 1
+        c = int(1024 * 1.5)  # channels
+        r = settings.IMG_RESOLUTION  # resolution input
+        ni_meta = 24  # number of meta-data input variables
+        d = settings.dropout_rate
+        n = 2
+
+        # encoder
+        self.encoder = nn.Sequential(
+            # start
+            self.rep_res(ci=3, co=c // 32, k=3, d=d, r=r, ex=False, sq=False,
+                         n=n),
+            # 32 --> 16
+            _Down(ci=c // 32, co=c // 32, ri=r, dr=d, sq=sq, ex=ex, n=n),
+            # 16 --> 8
+            _Down(ci=c // 32, co=c // 8, ri=r // 2, dr=d, sq=sq, ex=ex, n=n),
+            # 8 --> 4
+            _Down(ci=c // 8, co=c // 4, ri=r // 4, dr=d, sq=sq, ex=ex, n=n),
+            # 4 --> 1
+            blk.ConvBnHsDr(ci=c // 4, co=c - ni_meta, k=4, p=0, po=0, s=1,
+                           dr=d),
+        )
+
+        self.decoder = nn.Sequential(
+            # 1 --> 4
+            blk.ConvBnHsDr(ci=c, co=c // 4, k=4, s=1, p=0, po=0, t=True, dr=d),
+            # 4 --> 8
+            _Up(ci=c // 4 * a, co=c // 8, ri=r // 8, dr=d, sq=sq, ex=ex, n=n),
+            # 8 --> 16
+            _Up(ci=c // 8 * a, co=c // 32, ri=r // 4, dr=d, sq=sq,
+                ex=ex, n=n),
+            # 16 --> 32
+            _Up(ci=c // 32 * a, co=c // 32, ri=r // 2, dr=d,
+                sq=sq, ex=ex, mode='bicubic', n=n),
+            # end
+            nn.Sequential(
+                self.rep_res(ci=c // 32 * a, co=c // 32, k=3, d=d, r=r,
+                             sq=False,
+                             ex=False, n=n),
+                nn.Conv2d(
+                    in_channels=c // 32,
+                    out_channels=1,
+                    kernel_size=1,
+                    padding=0,
+                    bias=True
+                ),
+            ),
+        )
+
+    @staticmethod
+    def rep_res(ci, co, k, d, r, sq, ex, n):
+        blocks = []
+        for idx in range(n):
+            blocks.append(blk.InvResBlock(
+                ci=ci if idx is 0 else co,
+                co=co,
+                k=k,
+                dropout=d,
+                ri=r,
+                squeeze=sq,
+                expand=ex,
+            ))
+        return nn.Sequential(*blocks)
+
+
 class _Down(nn.Module, ABC):
 
     def __init__(self, ci, co, ri, dr, ex, sq, n):
         super().__init__()
-        self.down = nn.Conv2d(
-            in_channels=ci,
-            out_channels=ci,
-            kernel_size=2,
-            groups=ci,
-            stride=2,
-            bias=False
-        )
+        self.down = blk.ConvBnHs(ci=ci, co=ci, k=2, g=ci, p=0, s=2)
         blocks = []
         for idx in range(n):
             blocks.append(blk.InvResBlock(
                 ci=ci if idx is 0 else co,
                 co=co,
                 k=3,
+                p=1,
                 dropout=dr,
                 ri=ri // 2,
                 expand=ex,
@@ -45,6 +109,7 @@ class _Up(nn.Module, ABC):
                 ci=ci if idx is 0 else co,
                 co=co,
                 k=3,
+                p=1,
                 dropout=dr,
                 ri=ri,
                 expand=ex,
@@ -56,12 +121,8 @@ class _Up(nn.Module, ABC):
     @staticmethod
     def _get_up(co, ri, mode):
         if mode is 'transpose':
-            return nn.ConvTranspose2d(in_channels=co,
-                                      out_channels=co,
-                                      kernel_size=2,
-                                      groups=co,
-                                      stride=2,
-                                      bias=False)
+            return blk.ConvBnHs(ci=co, co=co, k=2, g=co, p=0, po=0, s=2,
+                                b=False, t=True)
         elif mode is 'bicubic':
             return nn.Upsample(size=(ri * 2, ri * 2),
                                mode='bicubic',
@@ -71,69 +132,6 @@ class _Up(nn.Module, ABC):
 
     def forward(self, x):
         return self.up(self.res(x))
-
-
-class _SarNetR(nn.Module, ABC):
-
-    def __init__(self, skip: bool, sq: bool, ex: bool):
-        super().__init__()
-
-        a = 2 if skip else 1
-        c = 1024  # channels
-        r = settings.IMG_RESOLUTION  # resolution input
-        ni_meta = 24  # number of meta-data input variables
-        d = settings.dropout_rate
-
-        # encoder
-        self.encoder = nn.Sequential(
-            # start
-            blk.InvResBlock(
-                ci=3,
-                co=c // 32,
-                k=3,
-                dropout=d,
-                ri=r,
-                expand=False,
-                squeeze=False
-            ),
-            # 32 --> 16
-            _Down(ci=c // 32, co=c // 32, ri=r, dr=d, sq=sq, ex=ex, n=3),
-            # 16 --> 8
-            _Down(ci=c // 32, co=c // 8, ri=r // 2, dr=d, sq=sq, ex=ex, n=3),
-            # 8 --> 4
-            _Down(ci=c // 8, co=c // 4, ri=r // 4, dr=d, sq=sq, ex=ex, n=3),
-            # 4 --> 1
-            blk.ConvBnHsDr(ci=c // 4, co=c - ni_meta, k=4, s=1, dr=d),
-        )
-
-        self.decoder = nn.Sequential(
-            # 1 --> 4
-            blk.ConvBnHsDr(ci=c, co=c // 4, k=4, s=1, t=True, dr=d),
-            # 4 --> 8
-            _Up(ci=c // 4 * a, co=c // 8, ri=r // 8, dr=d, sq=sq, ex=ex, n=3),
-            # 8 --> 16
-            _Up(ci=c // 8 * a, co=c // 32, ri=r // 4, dr=d, sq=sq,
-                ex=ex, n=3),
-            # 16 --> 32
-            _Up(ci=c // 32 * a, co=c // 32, ri=r // 2, dr=d,
-                sq=sq, ex=ex, mode='bicubic', n=3),
-            # end
-            blk.InvResBlock(
-                ci=c // 32 * a,
-                co=c // 32,
-                k=3,
-                dropout=d,
-                squeeze=False,
-                expand=False
-            ),
-            nn.Conv2d(
-                in_channels=c // 32,
-                out_channels=1,
-                kernel_size=1,
-                padding=0,
-                bias=True
-            ),
-        )
 
 
 class SarNetRS(_SarNetR, ABC):
@@ -159,7 +157,6 @@ class SarNetRS(_SarNetR, ABC):
         x = self.decoder[2](torch.cat([x, x3], dim=1))
         x = self.decoder[3](torch.cat([x, x2], dim=1))
         x = self.decoder[4](torch.cat([x, x1], dim=1))
-        x = self.decoder[5](x)
 
         return x
 

@@ -577,6 +577,20 @@ class Design:
                                           mse_valid=mse)
         timer.stop('updated performance parameter (mse_valid)')
 
+    @classmethod
+    def parameters_available_designs(cls, indent=''):
+        modelnames = cls.get_available_modelnames()
+        s = ''
+        for name in modelnames:
+            model = cls.get_model_from_name(name)
+
+            n_par = sum(p.numel() for p in model.parameters() if
+                        p.requires_grad)
+
+            s += '%s%s: %s\n' % (indent, name, Log.format_num(n_par))
+
+        return s[:-1]
+
     @staticmethod
     def _calc_tae(img_err):
         return torch.max(torch.max(img_err, dim=3).values,

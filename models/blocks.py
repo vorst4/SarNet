@@ -84,6 +84,8 @@ class ConvBnHs(nn.Module, ABC):
     s: stride
     p: padding
     po: output padding (only for tranpose convolutions)
+    g: groups
+    b: to use bias or not
     t: to use transpose convolutions or not
     """
 
@@ -95,6 +97,8 @@ class ConvBnHs(nn.Module, ABC):
             s: int = 1,
             p: int = None,
             po: int = 1,
+            g: int = 1,
+            b: bool = False,
             t: bool = False
     ):
         super().__init__()
@@ -119,15 +123,17 @@ class ConvBnHs(nn.Module, ABC):
                                   kernel_size=k,
                                   stride=s,
                                   padding=p,
-                                  bias=False)
+                                  groups=g,
+                                  bias=b)
         else:
             self.conv = nn.ConvTranspose2d(in_channels=ci,
                                            out_channels=co,
                                            kernel_size=k,
                                            stride=s,
                                            padding=p,
+                                           groups=g,
                                            output_padding=po,
-                                           bias=False)
+                                           bias=b)
         self.bn = nn.BatchNorm2d(num_features=co, **settings.batch_norm)
         self.hs = nn.Hardswish()
 
@@ -184,6 +190,7 @@ class InvResBlock(nn.Module, ABC):
                  ci: int = None,
                  ri: int = None,
                  k: [3, 5, 7] = 3,
+                 p: int = None,
                  downsample: bool = False,
                  upsample: bool = False,
                  upsample_mode: str = 'transpose',
@@ -222,7 +229,7 @@ class InvResBlock(nn.Module, ABC):
         _last_resolution_out = ro
 
         # determine padding
-        p = int((k - 1) * 0.5)
+        p = int((k - 1) * 0.5) if p is None else p
 
         # determine type of convolutional filter to use during depth-wise conv
         conv = self.transpose_conv if (upsample and transpose) else nn.Conv2d
