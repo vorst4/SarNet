@@ -149,12 +149,12 @@ class ConvBnHsDr(ConvBnHs, ABC):
             k: int,
             s: int = 1,
             p: int = 0,
-            dr: float = settings.dropout_rate,
+            d: float = settings.dropout_rate,
             po: int = 0,
             t: bool = False
     ):
         super().__init__(ci=ci, co=co, k=k, s=s, p=p, po=po, t=t)
-        self.dr = nn.Dropout2d(p=dr)
+        self.dr = nn.Dropout2d(p=d)
 
     def forward(self, x):
         return self.dr(self.hs(self.bn(self.conv(x))))

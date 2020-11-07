@@ -16,7 +16,7 @@ from util.timer import Timer
 # script, this is not necessary when running it on the desktop
 if settings.RUNNING_ON_DESKTOP:
     partition_id = 0
-    job_id = 2
+    job_id = 4
     n_cpus = 4
     n_gpus = 1
 else:
@@ -33,7 +33,7 @@ else:
 # ----------------------------------- MISC ---------------------------------- #
 
 # choose learning rate & model, based on job & partition id
-lr = 1e-5
+lr = 1e-6
 modelname = ['SarNetLN',
              'SarNetLS',
              'SarNetCN',

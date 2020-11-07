@@ -74,7 +74,7 @@ else:
         # file='dataset_msf.zip',
         max_samples=MAX_SAMPLES,
         train_pct=90,
-        n_subsets=1000,
+        n_subsets=500,
         shuffle_train=True,
         shuffle_valid=True,
     )

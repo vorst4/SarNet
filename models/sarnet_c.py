@@ -10,11 +10,6 @@ import settings
 
 
 class _SarNetC(nn.Module, ABC):
-    """
-    Convolutional Auto-encoder 1
-        bottleneck: 1 dense connected layer, batch norm and relu
-        decoder: 5 times (transpose conv2d, batch norm, relu)
-    """
 
     def __init__(self, skip: bool):
         super().__init__()
@@ -23,49 +18,54 @@ class _SarNetC(nn.Module, ABC):
         c = int(1024 * 1.5)
         r = settings.IMG_RESOLUTION  # resolution input
         n_meta = 24  # number of meta-data input variables
-        dr = settings.dropout_rate
+        d = settings.dropout_rate
+        n = 2
 
         self.encoder = nn.Sequential(
             # start
-            nn.Sequential(
-                blk.ConvBnHsDr(ci=3, co=c // 32, k=3, s=1, p=1, dr=dr),
-                blk.ConvBnHsDr(ci=c // 32, co=c // 32, k=3, s=1, p=1, dr=dr),
-            ),
+            self.rep_conv(ci=3, co=c // 32, k=3, s=1, p=1, d=d, n=2),
             # 32 -> 16
-            _Down(c // 32, c // 16, dr=dr),
+            _Down(c // 32, c // 16, dr=d),
             # 16 -> 8
-            _Down(c // 16, c // 8, dr=dr),
+            _Down(c // 16, c // 8, dr=d),
             # 8 -> 4
-            _Down(c // 8, c // 4, dr=dr),
+            _Down(c // 8, c // 4, dr=d),
             # 4 -> 1
-            blk.ConvBnHsDr(ci=c // 4, co=c - n_meta, k=4, s=1, p=0, dr=dr),
+            blk.ConvBnHsDr(ci=c // 4, co=c - n_meta, k=4, s=1, p=0, d=d),
         )
 
         self.decoder = nn.Sequential(
             # 1 -> 4
-            blk.ConvBnHsDr(ci=c, co=c//4, k=4, s=1, p=0, po=0, t=True, dr=dr),
+            blk.ConvBnHsDr(ci=c, co=c // 4, k=4, s=1, p=0, po=0, t=True, d=d),
             # 4 -> 8
-            _Up(ci=c // 4 * a, co=c // 8, ri=r // 8, m='transpose', dr=dr),
+            _Up(ci=c // 4 * a, co=c // 8, ri=r // 8, m='transpose', dr=d),
             # 8 -> 16
-            _Up(ci=c // 8 * a, co=c // 16, ri=r // 4, m='transpose', dr=dr),
+            _Up(ci=c // 8 * a, co=c // 16, ri=r // 4, m='transpose', dr=d),
             # 16 -> 32
-            _Up(ci=c // 16 * a, co=c // 32, ri=r // 2, m='transpose', dr=dr),
+            _Up(ci=c // 16 * a, co=c // 32, ri=r // 2, m='transpose', dr=d),
             # end
             nn.Sequential(
-                blk.ConvBnHsDr(ci=c // 32 * a, co=c // 32, k=3, s=1, p=1,
-                               dr=dr),
-                blk.ConvBnHsDr(ci=c // 32, co=c // 32, k=3, s=1, p=1, dr=dr),
+                self.rep_conv(ci=c // 32 * a, co=c // 32, k=3, s=1, p=1, d=d,
+                              n=2),
                 nn.Conv2d(in_channels=c // 32, out_channels=1, kernel_size=1),
             ),
         )
+
+    @staticmethod
+    def rep_conv(ci, co, k, s, p, d, n):
+        blocks = []
+        for idx in range(n):
+            ci = ci if idx is 0 else co
+            blocks.append(blk.ConvBnHsDr(ci=ci, co=co, k=k, s=s, p=p, d=d))
+        return nn.Sequential(*blocks)
 
 
 class _Down(nn.Module, ABC):
     def __init__(self, ci, co, dr):
         super().__init__()
         self.down = blk.ConvBnHs(ci=ci, co=ci, k=2, g=ci, p=0, s=2)
-        self.conv1 = blk.ConvBnHsDr(ci=ci, co=co, k=3, s=1, p=1, dr=dr)
-        self.conv2 = blk.ConvBnHsDr(ci=co, co=co, k=3, s=1, p=1, dr=dr)
+        self.conv1 = blk.ConvBnHsDr(ci=ci, co=co, k=3, s=1, p=1, d=dr)
+        self.conv2 = blk.ConvBnHsDr(ci=co, co=co, k=3, s=1, p=1, d=dr)
 
     def forward(self, x):
         return self.conv2(self.conv1(self.down(x)))
@@ -74,8 +74,8 @@ class _Down(nn.Module, ABC):
 class _Up(nn.Module, ABC):
     def __init__(self, ci, co, ri, m, dr):
         super().__init__()
-        self.conv1 = blk.ConvBnHsDr(ci=ci, co=co, k=3, s=1, p=1, dr=dr)
-        self.conv2 = blk.ConvBnHsDr(ci=co, co=co, k=3, s=1, p=1, dr=dr)
+        self.conv1 = blk.ConvBnHsDr(ci=ci, co=co, k=3, s=1, p=1, d=dr)
+        self.conv2 = blk.ConvBnHsDr(ci=co, co=co, k=3, s=1, p=1, d=dr)
         self.up = self._get_up(co, ri, m)
 
     @staticmethod
@@ -101,18 +101,15 @@ class SarNetCS(_SarNetC, ABC):
         super().__init__(skip=True)
 
     def forward(self, input_img, input_meta):
-        x = input_img
-
         # encoder
-        x1 = self.encoder[0](x)
+        x1 = self.encoder[0](input_img)
         x2 = self.encoder[1](x1)
         x3 = self.encoder[2](x2)
         x4 = self.encoder[3](x3)
         x = self.encoder[4](x4)
 
         # bottleneck
-        n = x.shape[0]
-        x = torch.cat([x, input_meta.reshape(n, -1, 1, 1)], dim=1)
+        x = torch.cat([x, input_meta.reshape(x.shape[0], -1, 1, 1)], dim=1)
 
         # decoder
         x = self.decoder[0](x)
@@ -131,6 +128,7 @@ class SarNetCN(_SarNetC, ABC):
         super().__init__(skip=False)
 
     def forward(self, input_img, input_meta):
+        # encoder
         x = self.encoder(input_img)
 
         # bottleneck
