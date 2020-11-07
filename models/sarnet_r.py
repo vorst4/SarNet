@@ -149,14 +149,14 @@ class SarNetRN(_SarNetR, ABC):
         return x
 
 
-class SarNetRSSE(SarNetRS, ABC):
+class SarNetMS(SarNetRS, ABC):
     lr_ideal = 1e-5
 
     def __init__(self):
         super().__init__(sq=True, ex=True)
 
 
-class SarNetRNSE(SarNetRN, ABC):
+class SarNetMN(SarNetRN, ABC):
     lr_ideal = 1e-5
 
     def __init__(self):

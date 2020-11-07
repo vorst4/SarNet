@@ -4,4 +4,4 @@ because 'util.design' will look here for all the existing models.
 """
 from .sarnet_l import SarNetLN, SarNetLS
 from .sarnet_c import SarNetCN, SarNetCS
-from .sarnet_r import SarNetRN, SarNetRS, SarNetRNSE, SarNetRSSE
+from .sarnet_r import SarNetRN, SarNetRS, SarNetMN, SarNetMS

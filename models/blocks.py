@@ -296,18 +296,10 @@ class InvResBlock(nn.Module, ABC):
         self.dropout = nn.Dropout2d(dropout) if dropout > 0 else None
 
         # upsample/downsample identity, if needed
-        if upsample or downsample or ci != co:
-            conv = nn.ConvTranspose2d if upsample and transpose else nn.Conv2d
-            self.identity = nn.Sequential(
-                conv(in_channels=ci,
-                     out_channels=co,
-                     kernel_size=2 if upsample and transpose else 1,
-                     stride=s,
-                     padding=0),
-                Upsample() if bicubic else Forward()
-            )
-        else:
-            self.identity = Forward()
+        self.identity = self.identity_block(upsample=upsample,
+                                            downsample=downsample,
+                                            bicubic=bicubic,
+                                            ci=ci, co=co)
 
         # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
@@ -322,6 +314,68 @@ class InvResBlock(nn.Module, ABC):
         self.stride = s
         self.padding = p
         self.kernel_size = k
+
+    @staticmethod
+    def identity_block(upsample: bool,
+                       downsample: bool,
+                       bicubic: bool,
+                       ci: int, co: int):
+
+        # check that upsample and downsample are not true at the same time
+        if upsample and downsample:
+            raise ValueError(
+                'upsample and downsample can not be true at the same time'
+            )
+
+        # if identity neither has to be up- or down-sampled:
+        if not (upsample or downsample):
+            if ci == co:
+                return Forward()
+            else:
+                return nn.Conv2d(in_channels=ci,
+                                 out_channels=co,
+                                 kernel_size=1,
+                                 stride=1,
+                                 padding=0,
+                                 bias=False)
+
+        # up-sampling
+        if upsample:
+            if bicubic:
+                if ci == co:
+                    return nn.Upsample(scale_factor=2, mode='bicubic',
+                                       align_corners=False)
+                else:
+                    return nn.Sequential(
+                        nn.Conv2d(in_channels=ci,
+                                  out_channels=co,
+                                  kernel_size=1,
+                                  stride=1,
+                                  padding=0,
+                                  bias=False),
+                        nn.Upsample(scale_factor=2, mode='bicubic',
+                                    align_corners=False)
+                    )
+            else:
+                return nn.ConvTranspose2d(in_channels=ci,
+                                          out_channels=co,
+                                          kernel_size=2,
+                                          stride=2,
+                                          padding=0,
+                                          output_padding=0,
+                                          groups=ci if ci == co else 1,
+                                          bias=False
+                                          )
+
+        # down-sampling
+        if downsample:
+            return nn.Conv2d(in_channels=ci,
+                             out_channels=co,
+                             kernel_size=2,
+                             stride=2,
+                             padding=0,
+                             groups=co if ci == co else 1,
+                             bias=False)
 
     @staticmethod
     def transpose_conv(**kwargs):

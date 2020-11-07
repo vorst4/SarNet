@@ -9,6 +9,14 @@ import models.blocks as blk
 import settings
 
 
+def rep_conv(ci, co, k, s, p, d, n):
+    blocks = []
+    for idx in range(n):
+        ci = ci if idx is 0 else co
+        blocks.append(blk.ConvBnHsDr(ci=ci, co=co, k=k, s=s, p=p, d=d))
+    return nn.Sequential(*blocks)
+
+
 class _SarNetC(nn.Module, ABC):
 
     def __init__(self, skip: bool):
@@ -23,13 +31,13 @@ class _SarNetC(nn.Module, ABC):
 
         self.encoder = nn.Sequential(
             # start
-            self.rep_conv(ci=3, co=c // 32, k=3, s=1, p=1, d=d, n=2),
+            rep_conv(ci=3, co=c // 32, k=3, s=1, p=1, d=d, n=2),
             # 32 -> 16
-            _Down(c // 32, c // 16, dr=d),
+            _Down(c // 32, c // 16, d=d, n=n),
             # 16 -> 8
-            _Down(c // 16, c // 8, dr=d),
+            _Down(c // 16, c // 8, d=d, n=n),
             # 8 -> 4
-            _Down(c // 8, c // 4, dr=d),
+            _Down(c // 8, c // 4, d=d, n=n),
             # 4 -> 1
             blk.ConvBnHsDr(ci=c // 4, co=c - n_meta, k=4, s=1, p=0, d=d),
         )
@@ -38,44 +46,34 @@ class _SarNetC(nn.Module, ABC):
             # 1 -> 4
             blk.ConvBnHsDr(ci=c, co=c // 4, k=4, s=1, p=0, po=0, t=True, d=d),
             # 4 -> 8
-            _Up(ci=c // 4 * a, co=c // 8, ri=r // 8, m='transpose', dr=d),
+            _Up(ci=c // 4 * a, co=c // 8, ri=r // 8, m='transpose', d=d, n=n),
             # 8 -> 16
-            _Up(ci=c // 8 * a, co=c // 16, ri=r // 4, m='transpose', dr=d),
+            _Up(ci=c // 8 * a, co=c // 16, ri=r // 4, m='transpose', d=d, n=n),
             # 16 -> 32
-            _Up(ci=c // 16 * a, co=c // 32, ri=r // 2, m='transpose', dr=d),
+            _Up(ci=c // 16 * a, co=c // 32, ri=r // 2, m='transpose', d=d,
+                n=n),
             # end
             nn.Sequential(
-                self.rep_conv(ci=c // 32 * a, co=c // 32, k=3, s=1, p=1, d=d,
-                              n=2),
+                rep_conv(ci=c // 32 * a, co=c // 32, k=3, s=1, p=1, d=d, n=n),
                 nn.Conv2d(in_channels=c // 32, out_channels=1, kernel_size=1),
             ),
         )
 
-    @staticmethod
-    def rep_conv(ci, co, k, s, p, d, n):
-        blocks = []
-        for idx in range(n):
-            ci = ci if idx is 0 else co
-            blocks.append(blk.ConvBnHsDr(ci=ci, co=co, k=k, s=s, p=p, d=d))
-        return nn.Sequential(*blocks)
-
 
 class _Down(nn.Module, ABC):
-    def __init__(self, ci, co, dr):
+    def __init__(self, ci, co, d, n):
         super().__init__()
         self.down = blk.ConvBnHs(ci=ci, co=ci, k=2, g=ci, p=0, s=2)
-        self.conv1 = blk.ConvBnHsDr(ci=ci, co=co, k=3, s=1, p=1, d=dr)
-        self.conv2 = blk.ConvBnHsDr(ci=co, co=co, k=3, s=1, p=1, d=dr)
+        self.conv = rep_conv(ci=ci, co=co, k=3, s=1, p=1, d=d, n=n)
 
     def forward(self, x):
-        return self.conv2(self.conv1(self.down(x)))
+        return self.conv(self.down(x))
 
 
 class _Up(nn.Module, ABC):
-    def __init__(self, ci, co, ri, m, dr):
+    def __init__(self, ci, co, ri, m, d, n):
         super().__init__()
-        self.conv1 = blk.ConvBnHsDr(ci=ci, co=co, k=3, s=1, p=1, d=dr)
-        self.conv2 = blk.ConvBnHsDr(ci=co, co=co, k=3, s=1, p=1, d=dr)
+        self.conv = rep_conv(ci=ci, co=co, k=3, s=1, p=1, d=d, n=n)
         self.up = self._get_up(co, ri, m)
 
     @staticmethod
@@ -91,7 +89,7 @@ class _Up(nn.Module, ABC):
             raise ValueError('invalid mode, can only be tranpose or bicubic')
 
     def forward(self, x):
-        return self.up(self.conv2(self.conv1(x)))
+        return self.up(self.conv(x))
 
 
 class SarNetCS(_SarNetC, ABC):
