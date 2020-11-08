@@ -72,9 +72,9 @@ else:
     dataset = Dataset.Settings(
         file='dataset_' + ds + '.zip',
         # file='dataset_msf.zip',
-        max_samples=MAX_SAMPLES,
+        max_samples=MAX_SAMPLES // 50,
         train_pct=90,
-        n_subsets=200,
+        n_subsets=200 // 50,
         shuffle_train=True,
         shuffle_valid=True,
     )

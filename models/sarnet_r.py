@@ -6,7 +6,7 @@ import torch
 from util.timer import Timer
 
 
-def rep_res(ci, co, k, d, r, n, p=1, sq=False, ex=False ):
+def rep_res(ci, co, k, d, r, n, p=1, sq=False, ex=False):
     blocks = []
     for idx in range(n):
         blocks.append(blk.InvResBlock(
@@ -147,6 +147,72 @@ class SarNetRN(_SarNetR, ABC):
         x = self.decoder(x)
 
         return x
+
+
+class SarNetRV(nn.Module, ABC):
+
+    def __init__(self, skip: bool = False, sq: bool = False, ex: bool = False):
+        super().__init__()
+
+        a = 2 if skip else 1
+        c = int(1024 * 1.5)  # channels
+        r = settings.IMG_RESOLUTION  # resolution input
+        n_meta = 24  # number of meta-data input variables
+        d = settings.dropout_rate
+        n = 2
+
+        self.encoder = nn.Sequential(
+            # start
+            rep_res(ci=3, co=c // 32, k=3, d=d, r=r, n=n),
+            # 32 --> 16
+            _Down(ci=c // 32, co=c // 32, ri=r, d=d, sq=sq, ex=ex, n=n),
+            # 16 --> 8
+            _Down(ci=c // 32, co=c // 8, ri=r // 2, d=d, sq=sq, ex=ex, n=n),
+            # 8 --> 4
+            _Down(ci=c // 8, co=c // 4, ri=r // 4, d=d, sq=sq, ex=ex, n=n),
+            # 4 --> 1
+            blk.ConvBnHsDr(ci=c // 4, co=c - n_meta, k=4, p=0, po=0, s=1,
+                           d=d),
+        )
+
+        self.decoder = nn.Sequential(
+            # 1 -> 4
+            blk.ConvBnHsDr(ci=c // 2, co=c // 4, k=4, s=1, p=0, po=0, t=True,
+                           d=d),
+            # 4 -> 8
+            _Up(ci=c // 4 * a, co=c // 8, ri=r // 8, d=d, sq=sq, ex=ex, n=n),
+            # 8 -> 16
+            _Up(ci=c // 8 * a, co=c // 32, ri=r // 4, d=d, sq=sq,
+                ex=ex, n=n),
+            # 16 -> 32
+            _Up(ci=c // 32 * a, co=c // 32, ri=r // 2, d=d,
+                sq=sq, ex=ex, mode='bicubic', n=n),
+            # end
+            nn.Sequential(
+                rep_res(ci=c // 32 * a, co=c // 32, k=3, d=d, r=r, n=n),
+                nn.Conv2d(in_channels=c // 32, out_channels=1, kernel_size=1),
+                nn.Sigmoid(),
+            ),
+        )
+
+    def forward(self, input_img, input_meta):
+        # encoder
+        x = self.encoder(input_img)
+
+        # bottleneck
+        x = torch.cat([x, input_meta.reshape(x.shape[0], -1, 1, 1)], dim=1)
+
+        # determine variational variables
+        n_batch, n_par = x.shape[0], x.shape[1] // 2
+        mu = x[:, :n_par, :]
+        var = x[:, n_par:, :]
+        std = torch.exp(0.5 * var)
+        x = mu + std * torch.randn_like(std)
+
+        # decoder
+        x = self.decoder(x)
+
+        return {'y': x, 'mu': mu, 'var': var}
 
 
 class SarNetMS(SarNetRS, ABC):

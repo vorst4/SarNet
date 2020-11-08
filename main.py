@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 import torch
+import torch.nn as nn
 import torchvision.transforms as transform
 from torch.utils.data import DataLoader
 
@@ -33,7 +34,7 @@ else:
 # ----------------------------------- MISC ---------------------------------- #
 
 # choose learning rate & model, based on job & partition id
-lr = 1e-6
+lr = 1e-4
 modelname = ['SarNetLN',
              'SarNetLS',
              'SarNetCN',
@@ -42,6 +43,8 @@ modelname = ['SarNetLN',
              'SarNetRS',
              'SarNetMN',
              'SarNetMS'][job_id]
+modelname = 'SarNetRV'
+lr = [1e-3, 1e-4, 1e-5][job_id]
 
 # set/create root path from modelname
 settings.progress.path = str(Path(str(settings.progress.path)).joinpath(
@@ -99,8 +102,8 @@ log('...done, memory usage (cpu): ' + log.cpu_memory_usage())
 
 # ------------------------------ DESIGN ------------------------------- #
 
-# loss function
-lf = torch.nn.MSELoss()
+# loss function use BCE for variational AE and MSE for the others
+lf = nn.BCELoss(reduction='sum') if 'V' in modelname else nn.MSELoss()
 log('using loss function: %s' % str(lf))
 
 # model & optimizer

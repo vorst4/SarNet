@@ -62,14 +62,14 @@ class Design:
         self.n_phase = 360
         self._dls_train: List[_Subset] = []
         self._dls_valid: List[_Subset] = []
-        self._model = nn.Module()
+        self._model: Optional[nn.Module()] = None
         self._loss_function = None
         self._optimizer = None
         self._lr_sched = None
         self._log: Optional[Log] = None
-        self._epoch_start = -1
-        self.epoch_current = -1.
-        self._epoch_stop = -1
+        self._epoch_start: int = -1
+        self.epoch_current: float = -1.
+        self._epoch_stop: int = -1
         self._timer: Optional[Timer] = None
         self.performance: Optional[Performance] = None
         self._mse_per_sample: Optional[MsePerSample] = None
@@ -479,7 +479,7 @@ class Design:
             timer_.stop('\tcalculated prediction')
 
             timer_.start()
-            loss = self._loss_function(yp, yt)
+            yp, loss = self._loss(yp, yt)
             timer_.stop('\tcalculated loss')
 
             # calculate gradient (a.k.a. backward propagation)
@@ -509,6 +509,19 @@ class Design:
         self.performance.mse_train.append(epoch=self.epoch_current,
                                           mse_train=mse)
         timer.stop('updated performance parameter')
+
+    def _loss(self, yp, yt):
+        # If not variational auto-encoder
+        if 'V' not in str(type(self._model)):
+            return yp, self._loss_function(yp, yt)
+
+        # If variational auto-encoder
+        else:
+            # unpack dict
+            yp, var, mu = yp['y'], yp['var'], yp['mu']
+            # calculate loss
+            bce = -0.5 * torch.sum(1 + var - mu ** 2 - var.exp())
+            return yp, self._loss_function(yp, yt) + bce
 
     def evaluate_subset(self, dataloader: DataLoader, progress: Progress):
         """
@@ -550,7 +563,7 @@ class Design:
                 timer_.stop('calculated prediction')
 
                 timer_.start()
-                loss = self._loss_function(yp, yt)
+                yp, loss = self._loss(yp, yt)
                 timer_.stop('calculated loss')
 
                 # calculate/append performance parameter (mse per sample)
