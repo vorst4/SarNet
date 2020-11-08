@@ -171,7 +171,7 @@ class SarNetRV(nn.Module, ABC):
             # 8 --> 4
             _Down(ci=c // 8, co=c // 4, ri=r // 4, d=d, sq=sq, ex=ex, n=n),
             # 4 --> 1
-            blk.ConvBnHsDr(ci=c // 4, co=c - n_meta, k=4, p=0, po=0, s=1,
+            blk.ConvBnHsDr(ci=c // 4, co=c - 2 * n_meta, k=4, p=0, po=0, s=1,
                            d=d),
         )
 
@@ -191,7 +191,6 @@ class SarNetRV(nn.Module, ABC):
             nn.Sequential(
                 rep_res(ci=c // 32 * a, co=c // 32, k=3, d=d, r=r, n=n),
                 nn.Conv2d(in_channels=c // 32, out_channels=1, kernel_size=1),
-                nn.Sigmoid(),
             ),
         )
 
@@ -199,15 +198,18 @@ class SarNetRV(nn.Module, ABC):
         # encoder
         x = self.encoder(input_img)
 
-        # bottleneck
-        x = torch.cat([x, input_meta.reshape(x.shape[0], -1, 1, 1)], dim=1)
-
         # determine variational variables
         n_batch, n_par = x.shape[0], x.shape[1] // 2
         mu = x[:, :n_par, :]
         var = x[:, n_par:, :]
         std = torch.exp(0.5 * var)
-        x = mu + std * torch.randn_like(std)
+        if self.training:
+            x = mu + std * torch.randn_like(std)
+        else:
+            x = mu + std ** 2
+
+        # bottleneck
+        x = torch.cat([x, input_meta.reshape(x.shape[0], -1, 1, 1)], dim=1)
 
         # decoder
         x = self.decoder(x)

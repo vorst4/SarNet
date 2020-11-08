@@ -28,6 +28,13 @@ if RUNNING_ON_DESKTOP:
         shuffle_valid=True,
     )
 
+    class Vae:
+        capacity_max = 25
+        capacity_stop = 1e5
+
+
+    beta = 4
+
     log = Log.Settings(
         directory=None,
         save_log=True,
@@ -78,6 +85,8 @@ else:
         shuffle_train=True,
         shuffle_valid=True,
     )
+
+    beta = 4
 
     # log
     log = Log.Settings(

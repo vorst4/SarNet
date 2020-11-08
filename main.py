@@ -17,7 +17,7 @@ from util.timer import Timer
 # script, this is not necessary when running it on the desktop
 if settings.RUNNING_ON_DESKTOP:
     partition_id = 0
-    job_id = 2
+    job_id = 0
     n_cpus = 4
     n_gpus = 1
 else:
@@ -103,7 +103,8 @@ log('...done, memory usage (cpu): ' + log.cpu_memory_usage())
 # ------------------------------ DESIGN ------------------------------- #
 
 # loss function use BCE for variational AE and MSE for the others
-lf = nn.BCELoss(reduction='sum') if 'V' in modelname else nn.MSELoss()
+# lf = nn.BCELoss(reduction='sum') if 'V' in modelname else nn.MSELoss()
+lf = nn.MSELoss()
 log('using loss function: %s' % str(lf))
 
 # model & optimizer

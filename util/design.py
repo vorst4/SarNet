@@ -6,6 +6,7 @@ from util.timer import Timer
 from typing import Union, List, Tuple, Optional
 
 import torch
+from torch import exp
 import torch.nn as nn
 import torch.nn.functional as functional
 import torch.optim
@@ -515,6 +516,25 @@ class Design:
         #                                   mse_train=mae)
         timer.stop('updated performance parameter')
 
+    @staticmethod
+    def _kullback_leibler_divergence(mu, logvar):
+        """
+        https://github.com/1Konny/Beta-VAE/blob/master/solver.py
+        """
+        batch_size = mu.size(0)
+        assert batch_size != 0
+        if mu.data.ndimension() == 4:
+            mu = mu.view(mu.size(0), mu.size(1))
+        if logvar.data.ndimension() == 4:
+            logvar = logvar.view(logvar.size(0), logvar.size(1))
+
+        klds = -0.5 * (1 + logvar - mu.pow(2) - logvar.exp())
+        total_kld = klds.sum(1).mean(0, True)
+        dimension_wise_kld = klds.mean(0)
+        mean_kld = klds.mean(1).mean(0, True)
+
+        return total_kld, dimension_wise_kld, mean_kld
+
     def _loss(self, yp, yt):
         # If not variational auto-encoder
         if 'V' not in str(type(self._model)):
@@ -523,10 +543,26 @@ class Design:
         # If variational auto-encoder
         else:
             # unpack dict
-            yp, var, mu = yp['y'], yp['var'], yp['mu']
+            yp, logvar, mu = yp['y'], yp['var'], yp['mu']
             # calculate loss
-            bce = -0.5 * torch.sum(1 + var - mu ** 2 - var.exp())
-            return yp, self._loss_function(yp, yt) + bce
+            kld = -0.5 * torch.sum(1 + logvar - mu ** 2 - exp(logvar))
+            # bce = -0.5 * torch.sum(1 + logvar - mu ** 2 - logvar.exp())
+            return yp, self._loss_function(yp, yt) + kld
+
+        # # --- beta-variational auto-encoder --- #
+        # # unpack dict
+        # yp, logvar, mu = yp['y'], yp['var'], yp['mu']
+        # # calculate loss
+        # n_batch = yt.shape[0]
+        # mse = functional.mse_loss(yp, yt)
+        # self.C_max = Variable(
+        #     cuda(torch.FloatTensor([self.C_max]), self.use_cuda))
+        # C = torch.clamp(self.C_max / self.C_stop_iter * self.global_iter, 0,
+        #                 self.C_max.data[0])
+        # beta_vae_loss = recon_loss + self.gamma * (total_kld - C).abs()
+        # kld_tot, _, _ = self._kullback_leibler_divergence(mu, logvar)
+        # loss = mse + settings.beta * kld_tot
+        # return yp, loss
 
     def evaluate_subset(self, dataloader: DataLoader, progress: Progress):
         """
