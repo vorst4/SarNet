@@ -17,7 +17,7 @@ from util.timer import Timer
 # script, this is not necessary when running it on the desktop
 if settings.RUNNING_ON_DESKTOP:
     partition_id = 0
-    job_id = 4
+    job_id = 2
     n_cpus = 4
     n_gpus = 1
 else:
@@ -44,7 +44,7 @@ modelname = ['SarNetLN',
              'SarNetMN',
              'SarNetMS'][job_id]
 modelname = 'SarNetRV'
-lr = [1e-3, 1e-4, 1e-5][job_id]
+lr = [1e-6, 1e-7][job_id]
 
 # set/create root path from modelname
 settings.progress.path = str(Path(str(settings.progress.path)).joinpath(

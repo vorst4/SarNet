@@ -7,6 +7,7 @@ from typing import Union, List, Tuple, Optional
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as functional
 import torch.optim
 import torch.utils.data
 from torch.utils.data import DataLoader
@@ -448,6 +449,7 @@ class Design:
 
         n_batches = len(dataloader)
         mse = 0.0
+        mae = 0.0
 
         timer = Timer(self._log)
 
@@ -456,14 +458,14 @@ class Design:
 
         # loop over batches
         for self.idx_batch, data in enumerate(dataloader):
-            timer.start()
+            # timer.start()
 
-            timer_.stop('\tloaded batch')
+            # timer_.stop('\tloaded batch')
 
             # make sure model is in train mode
-            timer_.start()
+            # timer_.start()
             self._model.train()
-            timer_.stop('\tset model to train mode')
+            # timer_.stop('\tset model to train mode')
 
             # abbreviate variables and move them to <device>
             timer_.start()
@@ -471,43 +473,46 @@ class Design:
             yt = data[Dataset.KEY.OUTPUT].to(**kwargs)
             x_img = data[Dataset.KEY.INPUT_IMGS].to(**kwargs)
             x_meta = data[Dataset.KEY.INPUT_META].to(**kwargs)
-            timer_.stop('\tabbreviated variables and moved them to device')
+            # timer_.stop('\tabbreviated variables and moved them to device')
 
             # calculate predicted outcome and loss
-            timer_.start()
+            # timer_.start()
             yp = self._model(x_img, x_meta)
-            timer_.stop('\tcalculated prediction')
+            # timer_.stop('\tcalculated prediction')
 
-            timer_.start()
+            # timer_.start()
             yp, loss = self._loss(yp, yt)
-            timer_.stop('\tcalculated loss')
+            # timer_.stop('\tcalculated loss')
 
             # calculate gradient (a.k.a. backward propagation)
-            timer_.start()
+            # timer_.start()
             loss.backward()
-            timer_.stop('\tcalculated backward propagation')
+            # timer_.stop('\tcalculated backward propagation')
 
             # update model parameters using the gradient
-            timer_.start()
+            # timer_.start()
             self._optimizer.step()
-            timer_.stop('\ttook optimizer step')
+            # timer_.stop('\ttook optimizer step')
 
             # add imgs to preview buffer
-            timer_.start()
+            # timer_.start()
             progress.add_imgs_to_preview_buffer(yp, yt)
-            timer_.stop('\tadded imgs to preview buffer')
+            # timer_.stop('\tadded imgs to preview buffer')
 
             # calculate mse
-            timer_.start()
+            # timer_.start()
             mse += loss.cpu().detach().item() / n_batches
-            timer_.stop('\tcalculated mse')
+            mae += functional.l1_loss(yp, yt) / n_batches
+            # timer_.stop('\tcalculated mse')
 
-            timer.stop('trained for 1 batch')
+            # timer.stop('trained for 1 batch')
 
         # update performance parameter
         timer.start()
         self.performance.mse_train.append(epoch=self.epoch_current,
                                           mse_train=mse)
+        # self.performance.mse_train.append(epoch=self.epoch_current,
+        #                                   mse_train=mae)
         timer.stop('updated performance parameter')
 
     def _loss(self, yp, yt):
@@ -538,6 +543,7 @@ class Design:
 
         n_batches = len(dataloader)
         mse = 0.0
+        mae = 0.0
         # tae = {'phase': [], 'tae': []}
         # mse = {'phase': [], 'mse': []}
 
@@ -581,6 +587,7 @@ class Design:
                 # calculate mse
                 timer_.start()
                 mse += loss.cpu().detach().item() / n_batches
+                mae += functional.l1_loss(yp, yt) / n_batches
                 timer_.stop('calculated mse')
                 timer.stop('calculated 1 validation batch')
 
@@ -588,6 +595,8 @@ class Design:
         timer.start()
         self.performance.mse_valid.append(epoch=self.epoch_current,
                                           mse_valid=mse)
+        # self.performance.mse_valid.append(epoch=self.epoch_current,
+        #                                   mse_valid=mae)
         timer.stop('updated performance parameter (mse_valid)')
 
     @classmethod
