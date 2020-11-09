@@ -34,7 +34,7 @@ else:
 # ----------------------------------- MISC ---------------------------------- #
 
 # choose learning rate & model, based on job & partition id
-lr = 1e-4
+lr = 1e-6
 modelname = ['SarNetLN',
              'SarNetLS',
              'SarNetCN',
@@ -44,7 +44,6 @@ modelname = ['SarNetLN',
              'SarNetMN',
              'SarNetMS'][job_id]
 modelname = 'SarNetRV'
-lr = [1e-5, 1e-6, 1e-7][job_id]
 
 # set/create root path from modelname
 settings.progress.path = str(Path(str(settings.progress.path)).joinpath(
