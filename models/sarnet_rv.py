@@ -15,6 +15,7 @@ class SarNetRV(nn.Module, ABC):
         r = settings.IMG_RESOLUTION  # resolution input
         n_meta = 24  # number of meta-data input variables
         d = settings.dropout_rate
+        d = 0
         n = 5
 
         self.encoder = nn.Sequential(
