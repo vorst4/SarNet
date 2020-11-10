@@ -35,14 +35,16 @@ else:
 
 # choose learning rate & model, based on job & partition id
 lr = 1e-6
-modelname = ['SarNetLN',
-             'SarNetLS',
-             'SarNetCN',
-             'SarNetCS',
-             'SarNetRN',
-             'SarNetRS',
-             'SarNetMN',
-             'SarNetMS'][job_id]
+modelname = [
+    'SarNetLN',  # 0
+    'SarNetLS',  # 1
+    'SarNetCN',  # 2
+    'SarNetCS',  # 3
+    'SarNetRN',  # 4
+    'SarNetRS',  # 5
+    'SarNetMN',  # 6
+    'SarNetMS',  # 7
+][job_id]
 modelname = 'SarNetRV'
 
 # set/create root path from modelname
