@@ -11,7 +11,7 @@ class SarNetRV(nn.Module, ABC):
     def __init__(self):
         super().__init__()
 
-        c = int(1024 * 1.5)  # channels
+        c = int(1024)  # channels
         r = settings.IMG_RESOLUTION  # resolution input
         n_meta = 24  # number of meta-data input variables
         d = settings.dropout_rate
@@ -45,7 +45,7 @@ class SarNetRV(nn.Module, ABC):
             Up(ci=c//8, co=c//16),
             # inverted stage 2: 16 -> 32
             ResBlocks(c=c//16, n=n),
-            Up(ci=c//32, co=c//32),
+            Up(ci=c//16, co=c//32),
             # end
             ResBlocks(c=c//32, n=n),
             conv(ci=c//32, co=1, k=1, p=0),
@@ -55,7 +55,7 @@ class SarNetRV(nn.Module, ABC):
         # encoder
         x = self.encoder(input_img)
 
-        # determine variational variables
+        # bottleneck
         n_batch, n_par = x.shape[0], x.shape[1] // 2
         mu, var = x[:, :n_par, :], x[:, n_par:, :]
         std = torch.exp(0.5 * var)
@@ -63,8 +63,7 @@ class SarNetRV(nn.Module, ABC):
             x = mu + std * torch.randn_like(std)
         else:
             x = mu + std ** 2
-
-        # bottleneck
+        # concatenate with applicator settings
         x = torch.cat([x, input_meta.view(x.shape[0], -1, 1, 1)], dim=1)
 
         # decoder
