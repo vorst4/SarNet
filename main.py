@@ -16,7 +16,7 @@ from util.timer import Timer
 # On the server, several parameters should be passed when running the
 # script, this is not necessary when running it on the desktop
 if settings.RUNNING_ON_DESKTOP:
-    partition_id = 0
+    partition_id = 1
     job_id = 0
     n_cpus = 4
     n_gpus = 1
@@ -34,27 +34,35 @@ else:
 # ----------------------------------- MISC ---------------------------------- #
 
 # choose learning rate & model, based on job & partition id
-lr = 1e-6
+lr = 1e-7
+# modelname = [
+#     'SarNetLN',  # 0
+#     'SarNetLS',  # 1
+#     'SarNetCN',  # 2
+#     'SarNetCS',  # 3
+#     'SarNetRN',  # 4
+#     'SarNetRS',  # 5
+#     'SarNetMN',  # 6
+#     'SarNetMS',  # 7
+# ][job_id]
 modelname = [
     'SarNetLN',  # 0
-    'SarNetLS',  # 1
     'SarNetCN',  # 2
-    'SarNetCS',  # 3
     'SarNetRN',  # 4
     'SarNetRS',  # 5
     'SarNetMN',  # 6
-    'SarNetMS',  # 7
 ][job_id]
-modelname = 'SarNetRV'
-lr = [1e-7, 1e-8][job_id]
+# modelname = 'SarNetRV'
+# lr = [1e-7, 1e-8][job_id]
 
 # set/create root path from modelname
-settings.progress.path = str(Path(str(settings.progress.path)).joinpath(
-    '%s_%s_d%s_s%i_j%i' % (settings.ds, modelname, Log.date_time(),
-                           partition_id, job_id)
-))
-if not Path(settings.progress.path).exists():
-    Path(settings.progress.path).mkdir()
+settings.progress.path = settings.progress.add_subdir(settings.progress.path,
+                                                      modelname,
+                                                      partition_id,
+                                                      job_id)
+
+print(settings.progress.path)
+exit()
 
 # initialize log
 if settings.log.directory is None:

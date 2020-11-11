@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from util.base_obj import BaseObj
 from PIL import Image
+import settings
 
 from .log import Log
 
@@ -110,6 +111,27 @@ class Progress:
             self.preview_padding = preview_padding
             self.preview_padding_set = preview_padding_set
             self.figure_size = figure_size
+
+        @staticmethod
+        def add_subdir(
+                path: str,
+                modelname: str,
+                partition_id: int,
+                job_id: int
+        ) -> str:
+            if not settings.progress.load_design:
+                dirname = '%s_%s_d%s_s%i_j%i' % (settings.ds, modelname,
+                                                 Log.date_time(),
+                                                 partition_id, job_id)
+                path = str(Path(path).joinpath(dirname))
+                if not Path(settings.progress.path).exists():
+                    Path(settings.progress.path).mkdir()
+            else:
+                path = (sorted(list(
+                    Path(path).glob('*%s*' % modelname)
+                ))[-1])
+
+            return path
 
     def __init__(self,
                  settings: Settings,

@@ -61,7 +61,7 @@ if RUNNING_ON_DESKTOP:
         print_=True,
         lossplot=False,
         preview=False,
-        load_design=False,
+        load_design=True,
         save_design=True,
         path='C:/Users/Dennis/Documents/desktop_resnet_output/',
         save_lossplot=True,
