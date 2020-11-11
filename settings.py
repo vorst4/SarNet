@@ -28,6 +28,7 @@ if RUNNING_ON_DESKTOP:
         shuffle_valid=True,
     )
 
+
     class Vae:
         capacity_max = 25
         capacity_stop = 1e5
@@ -79,9 +80,9 @@ else:
     dataset = Dataset.Settings(
         file='dataset_' + ds + '.zip',
         # file='dataset_msf.zip',
-        max_samples=MAX_SAMPLES,
+        max_samples=MAX_SAMPLES // 100,
         train_pct=90,
-        n_subsets=200 // 2,
+        n_subsets=200 // 2 // 100,
         shuffle_train=True,
         shuffle_valid=True,
     )

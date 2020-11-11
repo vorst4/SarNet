@@ -46,6 +46,7 @@ modelname = [
     'SarNetMS',  # 7
 ][job_id]
 modelname = 'SarNetRV'
+lr = [1e-7, 1e-8][job_id]
 
 # set/create root path from modelname
 settings.progress.path = str(Path(str(settings.progress.path)).joinpath(
