@@ -92,31 +92,31 @@ class _Up(nn.Module, ABC):
         return self.up(self.conv(x))
 
 
-class SarNetCS(_SarNetC, ABC):
-    lr_ideal = 1e-6
-
-    def __init__(self):
-        super().__init__(skip=True)
-
-    def forward(self, input_img, input_meta):
-        # encoder
-        x1 = self.encoder[0](input_img)
-        x2 = self.encoder[1](x1)
-        x3 = self.encoder[2](x2)
-        x4 = self.encoder[3](x3)
-        x = self.encoder[4](x4)
-
-        # bottleneck
-        x = torch.cat([x, input_meta.reshape(x.shape[0], -1, 1, 1)], dim=1)
-
-        # decoder
-        x = self.decoder[0](x)
-        x = self.decoder[1](torch.cat([x, x4], dim=1))
-        x = self.decoder[2](torch.cat([x, x3], dim=1))
-        x = self.decoder[3](torch.cat([x, x2], dim=1))
-        x = self.decoder[4](torch.cat([x, x1], dim=1))
-
-        return x
+# class SarNetCS(_SarNetC, ABC):
+#     lr_ideal = 1e-6
+#
+#     def __init__(self):
+#         super().__init__(skip=True)
+#
+#     def forward(self, input_img, input_meta):
+#         # encoder
+#         x1 = self.encoder[0](input_img)
+#         x2 = self.encoder[1](x1)
+#         x3 = self.encoder[2](x2)
+#         x4 = self.encoder[3](x3)
+#         x = self.encoder[4](x4)
+#
+#         # bottleneck
+#         x = torch.cat([x, input_meta.reshape(x.shape[0], -1, 1, 1)], dim=1)
+#
+#         # decoder
+#         x = self.decoder[0](x)
+#         x = self.decoder[1](torch.cat([x, x4], dim=1))
+#         x = self.decoder[2](torch.cat([x, x3], dim=1))
+#         x = self.decoder[3](torch.cat([x, x2], dim=1))
+#         x = self.decoder[4](torch.cat([x, x1], dim=1))
+#
+#         return x
 
 
 class SarNetC(_SarNetC, ABC):

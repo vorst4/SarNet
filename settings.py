@@ -86,6 +86,11 @@ else:
         shuffle_valid=True,
     )
 
+    log = Log.Settings(
+        directory=None,
+        save_log=True,
+    )
+
     dropout_rate = 0.4
 
     # log the timer or not

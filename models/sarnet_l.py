@@ -38,7 +38,7 @@ class _SarNetL(nn.Module, ABC):
 
 
 class SarNetL(_SarNetL, ABC):
-    lr_ideal = 1e-6
+    lr_ideal = 1e-7
 
     def __init__(self):
         super().__init__(False)
@@ -61,25 +61,25 @@ class SarNetL(_SarNetL, ABC):
         return x
 
 
-class SarNetLS(_SarNetL, ABC):
-    lr_ideal = 1e-5
-
-    def __init__(self):
-        super().__init__(True)
-
-    def forward(self, input_img, input_meta):
-        # encoder
-        x1 = self.enc1(input_img)
-        x2 = self.enc2(x1)
-        x3 = self.enc3(x2)
-        x4 = self.enc4(x3)
-        x = self.enc5(x4)
-
-        # decoder
-        x = self.dec1(torch.cat([x, input_meta], dim=1))
-        x = self.dec2(torch.cat([x, x4], dim=1))
-        x = self.dec3(torch.cat([x, x3], dim=1))
-        x = self.dec4(torch.cat([x, x2], dim=1))
-        x = self.dec5(torch.cat([x, x1], dim=1))
-
-        return x
+# class SarNetLS(_SarNetL, ABC):
+#     lr_ideal = 1e-5
+#
+#     def __init__(self):
+#         super().__init__(True)
+#
+#     def forward(self, input_img, input_meta):
+#         # encoder
+#         x1 = self.enc1(input_img)
+#         x2 = self.enc2(x1)
+#         x3 = self.enc3(x2)
+#         x4 = self.enc4(x3)
+#         x = self.enc5(x4)
+#
+#         # decoder
+#         x = self.dec1(torch.cat([x, input_meta], dim=1))
+#         x = self.dec2(torch.cat([x, x4], dim=1))
+#         x = self.dec3(torch.cat([x, x3], dim=1))
+#         x = self.dec4(torch.cat([x, x2], dim=1))
+#         x = self.dec5(torch.cat([x, x1], dim=1))
+#
+#         return x
