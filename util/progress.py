@@ -321,7 +321,7 @@ class Progress:
 
             # if the last validation loss is the lowest, also save it as
             # 'best' design (if epoch is finished)
-            _, lv = self.design.performance.mse_valid()
+            _, lv = self.design.performance.loss_valid()
             if lv[-1] == min(lv):
                 self.design.save(self.path_best_design,
                                  backups=self.path_best_design_backup)
@@ -380,8 +380,8 @@ class Progress:
         """
         ec = self.design.epoch_current
         es = self.design.get_epoch_stop()
-        _, lt = self.design.performance.mse_train(idx=-1)
-        _, lv = self.design.performance.mse_valid(idx=-1)
+        _, lt = self.design.performance.loss_train(idx=-1)
+        _, lv = self.design.performance.loss_valid(idx=-1)
         self.log.__call__(
             'Epoch:%8.4f/%i, loss_train: %3.8f, loss_val: %3.8f' %
             (ec, es, lt, lv)
@@ -393,8 +393,8 @@ class Progress:
         """
 
         # update lossplot
-        et, lt = self.design.performance.mse_train()
-        ev, lv = self.design.performance.mse_valid()
+        et, lt = self.design.performance.loss_train()
+        ev, lv = self.design.performance.loss_valid()
         self.line_train.set_xdata(et)
         self.line_train.set_ydata(lt)
         self.line_val.set_xdata(ev)
@@ -404,7 +404,7 @@ class Progress:
         fig = plt.figure(self.IDX_LOSSPLOT)
         plt.xlim([0, et[-1] + 0.1])
         plt.ylim([0.9 * min([min(lt), min(lv)]),
-                  1.1 * max([max(lt), max(lv)])])
+                  2 * max([lt[0], lv[0]])])
 
         # update lossplot display
         if self.settings.lossplot:

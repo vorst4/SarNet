@@ -280,7 +280,6 @@ class Dataset:
         self.dataloaders_train: List[DataLoader] = dataloaders_train
         self.dataloaders_valid: List[DataLoader] = dataloaders_valid
 
-
     def _generate_indices(self):
         """
         This method uses the first 'n_train' number of samples from the
@@ -367,9 +366,52 @@ class ToTensor:
         return sample
 
 
+class RandomRotation90:
+    """"
+    Applies a anti-clockwise rotation of increments of 90 degrees, meaning
+    that the rotations possible are: 0, 90, 180 and 270.
+    """
+
+    def __call__(self, sample: torch.tensor):
+        # rotate by 0 (k=0), 90 (k=1), 180 (k=2) or 270 (k=3) degrees
+        k = int(torch.randint(size=[1], low=0, high=4)[0])
+
+        # rotate input images
+        for idx, img in enumerate(sample[KEY.INPUT_IMGS]):
+            # uncomment code below to validate the rotation operation
+            # import matplotlib.pyplot as plt
+            # plt.figure()
+            # plt.imshow(img)
+            sample[KEY.INPUT_IMGS][idx] = torch.rot90(img, k=k, dims=(0, 1))
+            # plt.figure()
+            # plt.imshow(img)
+            # plt.show()
+
+        # rotate meta-data, note that amplitudes/phases are already oriented
+        #   in an anti-clockwise pattern. Uncomment code below in case you
+        #   want to validate the operation
+        # slice_phases = slice(1, 24, 2)
+        # k = 1
+        # phases_pre = sample[KEY.INPUT_META][slice_phases].clone()
+        sample[KEY.INPUT_META] = torch.roll(sample[KEY.INPUT_META], 6 * k)
+        # phases_post = sample[KEY.INPUT_META][slice_phases].clone()
+        # for phase_pre, phase_post in zip(phases_pre, phases_post):
+        #     print('%03i  %03i' % (int(360 * phase_pre), int(360 *
+        #                                                     phase_post)))
+        # exit()
+
+        # rotate output img
+        sample[KEY.OUTPUT] = torch.rot90(sample[KEY.OUTPUT], k=k, dims=(1, 2))
+
+        return sample
+
+
 class RandomRotation:
     """"
-    Applies a random discrete rotation to the sample
+    DISCONTINUED - DO NOT USE THIS, IT DISTORTS THE IMAGE !!!
+
+    Applies a random discrete rotation of increments of 30 degrees to the
+    sample
     """
 
     def __init__(self,
@@ -389,24 +431,30 @@ class RandomRotation:
     def random_degree(self):
         return self.degrees[int(torch.randint(len(self.degrees), [1]))]
 
+    def rotate(self, img: torch.tensor, degree: int):
+        # transform to pil
+        img = func.to_pil_image(img)
+
+        # rotate
+        img = func.rotate(img, degree, **self.kwargs)
+
+        # transform back to tensor
+        return func.to_tensor(img)
+
     def __call__(self, sample):
         # apply random rotation to sample and return it
         idx = int(torch.randint(len(self.degrees), [1]))
         rand_degree = self.degrees[idx]
 
-        # input images
+        # rotate input images
         for idx, img in enumerate(sample[KEY.INPUT_IMGS]):
-            sample[KEY.INPUT_IMGS][idx] = func.rotate(
-                img, self.degrees[idx], **self.kwargs
-            )
+            sample[KEY.INPUT_IMGS][idx] = self.rotate(img, self.degrees[idx])
 
-        # meta-data
+        # rotate meta-data
         sample[KEY.INPUT_META] = torch.roll(sample[KEY.INPUT_META], 2 * idx)
 
-        # output img
-        sample[KEY.OUTPUT] = func.rotate(
-            sample[KEY.OUTPUT], rand_degree, **self.kwargs
-        )
+        # rotate output img
+        sample[KEY.OUTPUT] = self.rotate(sample[KEY.OUTPUT], rand_degree)
 
         return sample
 

@@ -7,31 +7,40 @@ import settings
 class Performance:
 
     def __init__(self, n_validation_samples):
-
-        # do not initialize if n_valid_samples is None (convenient for hinting)
-        if n_validation_samples is None:
-            return
-
-        # ATTRIBUTES
         self.n_validation_samples = n_validation_samples
+        self.loss_train = _LossTrain()
+        self.loss_valid = _LossValid()
         self.mse_train = _MseTrain()
         self.mse_valid = _MseValid()
-        self.loss_valid = _MseSampleValid(n_validation_samples)
-
-    def to_dict(self):
-        return {
-            'mse_train': self.mse_train.to_dict(),
-            'mse_valid': self.mse_valid.to_dict(),
-            'loss_valid': self.loss_valid.to_dict(),
-            'n_validation_samples': self.n_validation_samples,
-        }
+        self.mape5_train = _Mape5Train()
+        self.mape5_valid = _Mape5Valid()
+        self.mape5i = _Mape5i(n_validation_samples)
 
     @classmethod
-    def load(cls, dictionary):
+    def load(cls, dictionary: dict):
         obj = cls(dictionary['n_validation_samples'])
+        obj.loss_train = _LossTrain.load(dictionary['loss_train'])
+        obj.loss_valid = _LossValid.load(dictionary['loss_valid'])
         obj.mse_train = _MseTrain.load(dictionary['mse_train'])
         obj.mse_valid = _MseValid.load(dictionary['mse_valid'])
+        obj.mape5_train = _Mape5Train.load(dictionary['mape5_train'])
+        obj.mape5_valid = _Mape5Valid.load(dictionary['mape5_valid'])
+        obj.mape5i = _Mape5i.load(dictionary['mape5i'])
         return obj
+
+    def to_dict(self):
+        """
+        create dictionary containing all attributes
+        """
+        dictionary = {}
+        for a in dir(self):
+            if a[0] is not '_':
+                a_type = str(type(getattr(self, a)))
+                if 'util.performance' in a_type:
+                    dictionary[a] = getattr(self, a).to_dict()
+                elif 'int' in a_type or 'float' in a_type:
+                    dictionary[a] = getattr(self, a)
+        return dictionary
 
 
 class _List:
@@ -123,10 +132,7 @@ class _DoubleList:
 
     @staticmethod
     def load(cls, dictionary: dict):
-        obj = cls(dictionary['x_label'],
-                  dictionary['y_label'],
-                  dictionary['z_label'],
-                  dictionary['size'])
+        obj = cls(dictionary['size'][1] / 0.05)
         obj.x = dictionary['x']
         obj.y = dictionary['y']
         obj.z = dictionary['z']
@@ -186,11 +192,39 @@ class _DoubleList:
         return str(self.to_dict())
 
 
-class _MseTrain(_List):
+class _LossTrain(_List):
 
     def __init__(self):
         super().__init__('epochs',
-                         'MSE_train',
+                         'Loss_train',
+                         settings.epochs * settings.dataset.n_subsets)
+
+    def append(self, epoch, loss_train):
+        super().append(epoch, loss_train)
+
+    @classmethod
+    def load(cls, dictionary):
+        return super().load(cls, dictionary)
+
+
+class _LossValid(_List):
+    def __init__(self):
+        super().__init__('epochs',
+                         'Loss_valid',
+                         settings.epochs * settings.dataset.n_subsets)
+
+    def append(self, epoch, loss_valid):
+        super().append(epoch, loss_valid)
+
+    @classmethod
+    def load(cls, dictionary):
+        return super().load(cls, dictionary)
+
+
+class _MseTrain(_List):
+
+    def __init__(self):
+        super().__init__('epochs', 'MSE_train',
                          settings.epochs * settings.dataset.n_subsets)
 
     def append(self, epoch, mse_train):
@@ -202,9 +236,9 @@ class _MseTrain(_List):
 
 
 class _MseValid(_List):
+
     def __init__(self):
-        super().__init__('epochs',
-                         'MSE_valid',
+        super().__init__('epochs', 'MSE_valid',
                          settings.epochs * settings.dataset.n_subsets)
 
     def append(self, epoch, mse_valid):
@@ -215,22 +249,50 @@ class _MseValid(_List):
         return super().load(cls, dictionary)
 
 
-class _MseSampleValid(_DoubleList):
+class _Mape5Train(_List):
+
+    def __init__(self):
+        super().__init__('epochs', 'MAPE5_train',
+                         settings.epochs * settings.dataset.n_subsets)
+
+    def append(self, epoch, mape5_train):
+        super().append(epoch, mape5_train)
+
+    @classmethod
+    def load(cls, dictionary):
+        return super().load(cls, dictionary)
+
+
+class _Mape5Valid(_List):
+
+    def __init__(self):
+        super().__init__('epochs', 'MAPE5_valid',
+                         settings.epochs * settings.dataset.n_subsets)
+
+    def append(self, epoch, mape5_valid):
+        super().append(epoch, mape5_valid)
+
+    @classmethod
+    def load(cls, dictionary):
+        return super().load(cls, dictionary)
+
+
+class _Mape5i(_DoubleList):
     """
     MSE of each individual sample from the validation set, per epoch.
     """
 
     def __init__(self, n_validation_samples):
+        n_mape5_samples = int(0.05 * n_validation_samples)
         super().__init__(x_label='epoch',
-                         y_label='mse',
+                         y_label='MAPE5i',
                          z_label='sample_idx',
-                         shape=(settings.epochs,
-                                n_validation_samples),
+                         shape=(settings.epochs, n_mape5_samples),
                          )
-        self.n_validation_samples = n_validation_samples
+        self.n_mape5_samples = n_mape5_samples
 
-    def append(self, epoch, mse_sample, sample_idx):
-        super().append(epoch, mse_sample, sample_idx)
+    def append(self, epoch, mape5i, sample_idx):
+        super().append(epoch, mape5i, sample_idx)
 
     @classmethod
     def load(cls, dictionary):
@@ -239,8 +301,8 @@ class _MseSampleValid(_DoubleList):
     def get_shape(self) -> dict:
         return {
             'len_epochs': self.shape[0],
-            'n_validation_samples': self.shape[1],
+            'n_mape5_samples': self.shape[1],
         }
 
     def allocate(self, len_epochs):
-        super().allocate(len_epochs * self.n_validation_samples)
+        super().allocate(len_epochs * self.n_mape5_samples)

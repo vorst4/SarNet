@@ -6,18 +6,22 @@ import torchvision.transforms as transform
 from torch.utils.data import DataLoader
 
 import settings
-from util.data import Dataset, RandomRotation, RandomVerticalFlip, \
-    Normalize, ToTensor
+import util.data as data
 from util.design import Design
 from util.log import Log
 from util.timer import Timer
+
+from util.report import Report
+
+# Report()
+# exit()
 
 # -------------------------------- ARGUMENTS -------------------------------- #
 # On the server, several parameters should be passed when running the
 # script, this is not necessary when running it on the desktop
 if settings.RUNNING_ON_DESKTOP:
     partition_id = 1
-    job_id = 0
+    job_id = 5
     n_cpus = 4
     n_gpus = 1
 else:
@@ -34,7 +38,7 @@ else:
 # ----------------------------------- MISC ---------------------------------- #
 
 # choose learning rate & model, based on job & partition id
-lr = 1e-7
+# lr = 1e-7
 # modelname = [
 #     'SarNetLN',  # 0
 #     'SarNetLS',  # 1
@@ -46,11 +50,13 @@ lr = 1e-7
 #     'SarNetMS',  # 7
 # ][job_id]
 modelname = [
-    'SarNetLN',  # 0
-    'SarNetCN',  # 2
-    'SarNetRN',  # 4
-    'SarNetRS',  # 5
-    'SarNetMN',  # 6
+    'SarNetL',  # 0
+    'SarNetC',  # 1
+    'SarNetRN',  # 2
+    'SarNetRS',  # 3
+    'SarNetM',  # 4
+    'SarNetRV',  # 5
+    'SarNetRN',  # 6  , including data augmentations
 ][job_id]
 # modelname = 'SarNetRV'
 # lr = [1e-7, 1e-8][job_id]
@@ -60,9 +66,6 @@ settings.progress.path = settings.progress.add_subdir(settings.progress.path,
                                                       modelname,
                                                       partition_id,
                                                       job_id)
-
-print(settings.progress.path)
-exit()
 
 # initialize log
 if settings.log.directory is None:
@@ -85,24 +88,18 @@ timer = Timer(log)
 # log
 log('setting up dataset')
 
-# transformation functions to be applied to training and validation dataset
-trans_train = transform.Compose([
-    RandomRotation(),
-    RandomVerticalFlip(),
-    ToTensor(),
-    Normalize(),
-])
-trans_val = transform.Compose([
-    ToTensor(),
-    Normalize(),
-])
+# transformation functions to be applied to training data
+if job_id is 6:
+    trans_train = transform.Compose([
+        data.RandomRotation90(),
+        data.RandomVerticalFlip(),
+    ])
+else:
+    trans_train = None
 
 # create dataset and obtain DataLoader objects for train/valid set
 timer.start()
-ds = Dataset(settings.dataset,
-             # trans_train=trans_train,  # todo: check if these are correct
-             # trans_val=trans_val  # todo: check if these are correct
-             )
+ds = data.Dataset(settings.dataset, trans_train=trans_train)
 log('  dataset file: %s' % str(ds.settings.file))
 dls_train, dls_valid = ds.dataloaders_train, ds.dataloaders_valid
 timer.stop('created dataset')
@@ -122,10 +119,20 @@ log('initializing model...')
 model = Design.get_model_from_name(modelname)
 log('...done')
 
+# optimizer
+lr_init = settings.learning_rate.initial
+lr_init = model.lr_ideal if lr_init is None else lr_init
 optimizer = torch.optim.Adam(
-    model.parameters(), lr=lr
+    model.parameters(), lr=lr_init
 )
 log('using optimizer: \n  %s' % str(optimizer).replace('\n', '\n  '))
+
+# learning rate scheduler
+lr_sched = torch.optim.lr_scheduler.StepLR(
+    optimizer=optimizer,
+    step_size=settings.learning_rate.step_size,
+    gamma=settings.learning_rate.gamma,
+)
 
 # design
 log('creating design...')

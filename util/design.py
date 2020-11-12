@@ -21,17 +21,35 @@ from util.performance import Performance
 from .progress import Progress
 
 
-class MsePerSample:
+class MAPE5i:
     def __init__(self, img_res):
-        if img_res is None:
-            return
-        self.mse_loss = nn.MSELoss(reduction='none')
-        self.scalar = 1 / img_res ** 2
+        self.mae_loss = nn.L1Loss(reduction='none')
+        self.r5 = int(0.05 * img_res ** 2)
+        self.scalar = 100 / self.r5
 
-    def __call__(self, batch_pred, batch_true):
-        return (torch.sum(
-            self.mse_loss(batch_pred, batch_true), dim=[1, 2, 3]
-        ) * self.scalar).tolist()
+    def _top5(self, n_batch, batch_true):
+        return torch.argsort(batch_true.view(n_batch, -1), dim=1)[:self.r5]
+
+    def __call__(self, batch_pred, batch_true) -> torch.tensor:
+        # batch size
+        n = batch_true.shape[0]
+
+        # flatten tensors, and make sure they are on cpu memory
+        yt = batch_true.view(n, -1).cpu().detach()
+        yp = batch_pred.view(n, -1).cpu().detach()
+
+        # obtain ids/pixel-locations of top 5% largest yt values
+        ids = torch.argsort(yt, dim=1, descending=True)[:, :self.r5]
+
+        # calculate mape5i
+        # todo: find a more efficient way than a for loop
+        mape5i = torch.empty(n)
+        for i, j in enumerate(ids):
+            mape5i[i] = self.scalar * torch.sum(torch.abs(
+                (yt[i, j] - yp[i, j]) / yt[i, j]
+            ))
+
+        return mape5i
 
 
 class Design:
@@ -74,7 +92,7 @@ class Design:
         self._epoch_stop: int = -1
         self._timer: Optional[Timer] = None
         self.performance: Optional[Performance] = None
-        self._mse_per_sample: Optional[MsePerSample] = None
+        self._mape5i: Optional[MAPE5i] = None
         torch.manual_seed(self._torch_seed)
 
     def create(self,
@@ -232,10 +250,10 @@ class Design:
         self._epoch_stop = epoch_stop
 
         # allocate space for the performance parameters
-        self.performance.mse_train.allocate(
+        self.performance.loss_train.allocate(
             epoch_stop * settings.dataset.n_subsets
         )
-        self.performance.mse_valid.allocate(
+        self.performance.loss_valid.allocate(
             epoch_stop * settings.dataset.n_subsets
         )
         self.performance.loss_valid.allocate(
@@ -346,7 +364,7 @@ class Design:
         progress = Progress(progress_settings, self, self._log, img_res)
         timer.stop('created progress obj')
 
-        self._mse_per_sample = MsePerSample(img_res)
+        self._mape5i = MAPE5i(img_res)
 
         # load previous model state if needed
         timer.start()
@@ -432,9 +450,9 @@ class Design:
             # self.saved_after_epoch = True
             # progress(img_true, img_pred)
 
-            # # update learning rate
-            # if lr_sched is not None:
-            #     lr_sched.step()
+        # update learning rate
+        if self._lr_sched is not None:
+            self._lr_sched.step()
 
         # epoch current isn't updated after the last iteration, so this has
         # to be done manually
@@ -449,8 +467,9 @@ class Design:
         """
 
         n_batches = len(dataloader)
+        loss_batch = 0.0
         mse = 0.0
-        mae = 0.0
+        mape5 = 0.0
 
         timer = Timer(self._log)
 
@@ -502,67 +521,23 @@ class Design:
 
             # calculate mse
             # timer_.start()
-            mse += loss.cpu().detach().item() / n_batches
-            mae += functional.l1_loss(yp, yt) / n_batches
+            loss_batch += loss.cpu().detach().item() / n_batches
+            mse += functional.mse_loss(yp, yt) / n_batches
+            mape5i = self._mape5i(yp, yt)
+            mape5 += torch.sum(mape5i) / (mape5i.shape[0] * n_batches)
             # timer_.stop('\tcalculated mse')
 
             # timer.stop('trained for 1 batch')
 
         # update performance parameter
         timer.start()
+        self.performance.loss_train.append(epoch=self.epoch_current,
+                                           loss_train=loss_batch)
         self.performance.mse_train.append(epoch=self.epoch_current,
                                           mse_train=mse)
-        # self.performance.mse_train.append(epoch=self.epoch_current,
-        #                                   mse_train=mae)
+        self.performance.mape5_train.append(epoch=self.epoch_current,
+                                            mape5_train=mape5)
         timer.stop('updated performance parameter')
-
-    @staticmethod
-    def _kullback_leibler_divergence(mu, logvar):
-        """
-        https://github.com/1Konny/Beta-VAE/blob/master/solver.py
-        """
-        batch_size = mu.size(0)
-        assert batch_size != 0
-        if mu.data.ndimension() == 4:
-            mu = mu.view(mu.size(0), mu.size(1))
-        if logvar.data.ndimension() == 4:
-            logvar = logvar.view(logvar.size(0), logvar.size(1))
-
-        klds = -0.5 * (1 + logvar - mu.pow(2) - logvar.exp())
-        total_kld = klds.sum(1).mean(0, True)
-        dimension_wise_kld = klds.mean(0)
-        mean_kld = klds.mean(1).mean(0, True)
-
-        return total_kld, dimension_wise_kld, mean_kld
-
-    def _loss(self, yp, yt):
-        # If not variational auto-encoder
-        if 'V' not in str(type(self._model)):
-            return yp, self._loss_function(yp, yt)
-
-        # If variational auto-encoder
-        else:
-            # unpack dict
-            yp, logvar, mu = yp['y'], yp['var'], yp['mu']
-            # calculate loss
-            kld = -0.5 * torch.sum(1 + logvar - mu ** 2 - exp(logvar))
-            # bce = -0.5 * torch.sum(1 + logvar - mu ** 2 - logvar.exp())
-            return yp, self._loss_function(yp, yt) + kld
-
-        # # --- beta-variational auto-encoder --- #
-        # # unpack dict
-        # yp, logvar, mu = yp['y'], yp['var'], yp['mu']
-        # # calculate loss
-        # n_batch = yt.shape[0]
-        # mse = functional.mse_loss(yp, yt)
-        # self.C_max = Variable(
-        #     cuda(torch.FloatTensor([self.C_max]), self.use_cuda))
-        # C = torch.clamp(self.C_max / self.C_stop_iter * self.global_iter, 0,
-        #                 self.C_max.data[0])
-        # beta_vae_loss = recon_loss + self.gamma * (total_kld - C).abs()
-        # kld_tot, _, _ = self._kullback_leibler_divergence(mu, logvar)
-        # loss = mse + settings.beta * kld_tot
-        # return yp, loss
 
     def evaluate_subset(self, dataloader: DataLoader, progress: Progress):
         """
@@ -577,9 +552,10 @@ class Design:
         self._model.eval()
         timer.stop('model set to evaluation mode')
 
-        n_batches = len(dataloader)
+        n_batch = len(dataloader)
+        loss_batch = 0.0
         mse = 0.0
-        mae = 0.0
+        mape5 = 0.0
         # tae = {'phase': [], 'tae': []}
         # mse = {'phase': [], 'mse': []}
 
@@ -610,10 +586,11 @@ class Design:
 
                 # calculate/append performance parameter (mse per sample)
                 timer_.start()
-                self.performance.loss_valid.append(
+                mape5i = self._mape5i(yp, yt)
+                self.performance.mape5i.append(
                     epoch=self.epoch_current,
-                    mse_sample=self._mse_per_sample(yp, yt),
-                    sample_idx=data[Dataset.KEY.INDEX]
+                    mape5i=mape5i.tolist(),
+                    sample_idx=data[Dataset.KEY.INDEX].tolist()
                 )
                 timer_.stop('added performance parameter (loss_valid)')
 
@@ -622,18 +599,35 @@ class Design:
 
                 # calculate mse
                 timer_.start()
-                mse += loss.cpu().detach().item() / n_batches
-                mae += functional.l1_loss(yp, yt) / n_batches
+                loss_batch += loss.cpu().detach().item() / n_batch
+                mse += functional.mse_loss(yp, yt) / n_batch
+                mape5 += torch.sum(mape5i) / (mape5i.shape[0] * n_batch)
                 timer_.stop('calculated mse')
                 timer.stop('calculated 1 validation batch')
 
         # update performance parameter
         timer.start()
+        self.performance.loss_valid.append(epoch=self.epoch_current,
+                                           loss_valid=loss_batch)
         self.performance.mse_valid.append(epoch=self.epoch_current,
                                           mse_valid=mse)
-        # self.performance.mse_valid.append(epoch=self.epoch_current,
-        #                                   mse_valid=mae)
+        self.performance.mape5_valid.append(epoch=self.epoch_current,
+                                            mape5_valid=mape5)
         timer.stop('updated performance parameter (mse_valid)')
+
+    def _loss(self, yp, yt):
+        # If not variational auto-encoder
+        if 'V' not in str(type(self._model)):
+            return yp, self._loss_function(yp, yt)
+
+        # If variational auto-encoder
+        else:
+            # unpack dict
+            yp, logvar, mu = yp['y'], yp['var'], yp['mu']
+            # calculate loss
+            kld = -0.5 * torch.sum(1 + logvar - mu ** 2 - exp(logvar))
+            # bce = -0.5 * torch.sum(1 + logvar - mu ** 2 - logvar.exp())
+            return yp, self._loss_function(yp, yt) + kld
 
     @classmethod
     def parameters_available_designs(cls, indent=''):

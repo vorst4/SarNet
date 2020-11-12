@@ -93,7 +93,7 @@ class _Up(nn.Module, ABC):
 
 
 class SarNetCS(_SarNetC, ABC):
-    lr_ideal = 1e-6  # 1e-5 is also stable
+    lr_ideal = 1e-6
 
     def __init__(self):
         super().__init__(skip=True)
@@ -119,8 +119,8 @@ class SarNetCS(_SarNetC, ABC):
         return x
 
 
-class SarNetCN(_SarNetC, ABC):
-    lr_ideal = 1e-6  # 1e-5 is also stable
+class SarNetC(_SarNetC, ABC):
+    lr_ideal = 1e-6
 
     def __init__(self):
         super().__init__(skip=False)

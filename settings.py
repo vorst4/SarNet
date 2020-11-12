@@ -3,6 +3,7 @@ import os
 from util.progress import Progress
 from util.data import Dataset
 from util.log import Log
+from util.optimizer import LearningRate
 import torch
 
 RUNNING_ON_DESKTOP = os.name == 'nt'  # nt: Windows , posix: Linux
@@ -28,14 +29,6 @@ if RUNNING_ON_DESKTOP:
         shuffle_valid=True,
     )
 
-
-    class Vae:
-        capacity_max = 25
-        capacity_stop = 1e5
-
-
-    beta = 4
-
     log = Log.Settings(
         directory=None,
         save_log=True,
@@ -54,19 +47,25 @@ if RUNNING_ON_DESKTOP:
 
     # settings learning-rate tuner
     # beta1s = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.999]
-    epochs = 2
+    epochs = 6
 
     # progress logging settings
     progress = Progress.Settings(
         print_=True,
         lossplot=False,
         preview=False,
-        load_design=True,
+        load_design=False,
         save_design=True,
         path='C:/Users/Dennis/Documents/desktop_resnet_output/',
         save_lossplot=True,
         save_preview=True,
     )
+
+    learning_rate = LearningRate.Settings(
+            initial=None,  # use learning rate as defined in model
+            step_size=1,  # decay every <step_size> epochs
+            gamma=0.9  # decay factor
+        )
 
 # -----------------------------------------------------------------------------
 # SETTINGS SERVER
@@ -80,19 +79,11 @@ else:
     dataset = Dataset.Settings(
         file='dataset_' + ds + '.zip',
         # file='dataset_msf.zip',
-        max_samples=MAX_SAMPLES // 100,
+        max_samples=MAX_SAMPLES,
         train_pct=90,
-        n_subsets=200 // 2 // 100,
+        n_subsets=50,
         shuffle_train=True,
         shuffle_valid=True,
-    )
-
-    beta = 4
-
-    # log
-    log = Log.Settings(
-        directory=None,
-        save_log=True,
     )
 
     dropout_rate = 0.4
@@ -117,7 +108,14 @@ else:
         path='/home/tue/s111167/trained_models/',
         save_lossplot=True,
         save_preview=True,
+        n_backups=1,
     )
+
+    learning_rate = LearningRate.Settings(
+            initial=None,  # use learning rate as defined in model
+            step_size=1,  # decay every <step_size> epochs
+            gamma=0.9  # decay factor
+        )
 
 
 def info(indent: str = ' ' * 2):
