@@ -39,7 +39,6 @@ else:
 
 # choose learning rate & model, based on job & partition id
 # lr = 1e-7
-job_id = 5
 modelname = [
     'SarNetL',  # 0
     'SarNetC',  # 1
