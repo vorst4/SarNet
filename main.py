@@ -49,7 +49,7 @@ else:
 #     'SarNetMN',  # 6
 #     'SarNetMS',  # 7
 # ][job_id]
-job_id = 6
+job_id = 5
 modelname = [
     'SarNetL',  # 0
     'SarNetC',  # 1
