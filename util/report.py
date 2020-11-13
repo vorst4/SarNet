@@ -8,11 +8,13 @@ import torch
 from zipfile import ZipFile
 from util.data import IDX, KEY
 from numpy import pi
+import numpy as np
 
 root_models = 'C:/Users/Dennis/Documents/desktop_resnet_output'
-modelpaths = [str(p) for p in Path(root_models).glob('*/best_design.pt')]
+modelpaths = [str(p) for p in Path(root_models).glob('*/design.pt')]
 dataset_path = settings.dataset.file
 n_samples_dataset = settings.dataset.max_samples
+interpolation_scale = 0.25
 
 
 class Report:
@@ -52,24 +54,49 @@ class Report:
         self.slice_phases = slice(1, 24, 2)
         self.slice_amplitudes = slice(0, 24, 2)
 
-        self.loss_train()
-        self.loss_valid()
-        self.mse_train()
-        self.mse_valid()
+        # self.loss_train()
+        # self.loss_valid()
+        # self.mse_train()
+        # self.mse_valid()
         self.mape5_train()
         self.mape5_valid()
-
+        #
         # self.mape5i_idx()
         # self.mape5i_phase()
 
         plt.show()
         exit()
 
-    def _plot(self, attribute, save, show):
+    @staticmethod
+    def average(x, y, ns):
+        """
+        average data [x,y] over every ns sample-points
+        """
+        n = len(x)
+        xa, ya = [], []
+        for idx in range(len(x)):
+            ids = slice(idx * ns, (idx + 1) * ns, 1)
+            try:
+                xa.append(np.mean(x[ids]))
+                ya.append(np.mean(y[ids]))
+            except IndexError:
+                break
+        return xa, ya
+
+    def _plot(self, attribute, save, show, n_average=None, log=True):
         plt.figure()
         for p, name in zip(self.performances, self.modelnames):
             obj = getattr(p, attribute)
-            plt.semilogy(obj.x[:obj.idx], obj.y[:obj.idx], label=name)
+            # print(obj.idx)
+            # print(obj.x[:obj.idx])
+            print(obj.y)
+            x, y = obj.x[:obj.idx], obj.y[:obj.idx]
+            if n_average is not None:
+                x, y = self.average(x, y, n_average)
+            if log:
+                plt.semilogy(x, y, label=name)
+            else:
+                plt.plot(x, y, label=name)
         plt.xlabel('epochs')
         plt.ylabel('Loss')
         plt.legend()
@@ -79,7 +106,7 @@ class Report:
         if show:
             plt.show()
 
-    def loss_train(self, save: bool = False, show: bool = False):
+    def loss_train(self, save: bool = False, show: bool = False, ):
         self._plot('loss_train', save, show)
         plt.title('Loss Training')
 
@@ -96,11 +123,11 @@ class Report:
         plt.title('MSE Validation')
 
     def mape5_train(self, save: bool = False, show: bool = False):
-        self._plot('mape5_train', save, show)
+        self._plot('mape5_train', save, show, log=False)
         plt.title('MAPE5 Training')
 
     def mape5_valid(self, save: bool = False, show: bool = False):
-        self._plot('mape5_valid', save, show)
+        self._plot('mape5_valid', save, show, log=False)
         plt.title('MAPE5 Validation')
         pass
 

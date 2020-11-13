@@ -62,10 +62,10 @@ if RUNNING_ON_DESKTOP:
     )
 
     learning_rate = LearningRate.Settings(
-            initial=None,  # use learning rate as defined in model
-            step_size=1,  # decay every <step_size> epochs
-            gamma=0.9  # decay factor
-        )
+        initial=None,  # use learning rate as defined in model
+        step_size=1,  # decay every <step_size> epochs
+        gamma=0.9  # decay factor
+    )
 
 # -----------------------------------------------------------------------------
 # SETTINGS SERVER
@@ -81,7 +81,7 @@ else:
         # file='dataset_msf.zip',
         max_samples=MAX_SAMPLES,
         train_pct=90,
-        n_subsets=50,
+        n_subsets=15,
         shuffle_train=True,
         shuffle_valid=True,
     )
@@ -117,10 +117,10 @@ else:
     )
 
     learning_rate = LearningRate.Settings(
-            initial=None,  # use learning rate as defined in model
-            step_size=1,  # decay every <step_size> epochs
-            gamma=0.9  # decay factor
-        )
+        initial=None,  # use learning rate as defined in model
+        step_size=1,  # decay every <step_size> epochs
+        gamma=0.9  # decay factor
+    )
 
 
 def info(indent: str = ' ' * 2):

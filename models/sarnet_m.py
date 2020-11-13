@@ -10,7 +10,7 @@ from abc import ABC
 
 
 class SarNetM(SarNetRN, ABC):
-    lr_ideal = 1e-6  # todo change to 1e-7
+    lr_ideal = 1e-7
 
     def __init__(self):
         super().__init__(sq=True, ex=True)

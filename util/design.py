@@ -45,9 +45,11 @@ class MAPE5i:
         # todo: find a more efficient way than a for loop
         mape5i = torch.empty(n)
         for i, j in enumerate(ids):
-            mape5i[i] = self.scalar * torch.sum(torch.abs(
+            a = self.scalar * torch.sum(torch.abs(
                 (yt[i, j] - yp[i, j]) / yt[i, j]
             ))
+            # todo: find a solution to below
+            mape5i[i] = a if not torch.isinf(a) else 100
 
         return mape5i
 
