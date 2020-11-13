@@ -39,16 +39,6 @@ else:
 
 # choose learning rate & model, based on job & partition id
 # lr = 1e-7
-# modelname = [
-#     'SarNetLN',  # 0
-#     'SarNetLS',  # 1
-#     'SarNetCN',  # 2
-#     'SarNetCS',  # 3
-#     'SarNetRN',  # 4
-#     'SarNetRS',  # 5
-#     'SarNetMN',  # 6
-#     'SarNetMS',  # 7
-# ][job_id]
 job_id = 5
 modelname = [
     'SarNetL',  # 0
@@ -59,8 +49,6 @@ modelname = [
     'SarNetRV',  # 5
     'SarNetRN',  # 6  , including data augmentations
 ][job_id]
-# modelname = 'SarNetRV'
-# lr = [1e-7, 1e-8][job_id]
 
 # set/create root path from modelname
 settings.progress.path = settings.progress.add_subdir(settings.progress.path,
