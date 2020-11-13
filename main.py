@@ -13,8 +13,8 @@ from util.timer import Timer
 
 from util.report import Report
 
-Report()
-exit()
+# Report()
+# exit()
 
 # -------------------------------- ARGUMENTS -------------------------------- #
 # On the server, several parameters should be passed when running the
