@@ -120,7 +120,7 @@ class _Up(nn.Module, ABC):
 
 
 class SarNetC(_SarNetC, ABC):
-    lr_ideal = 1e-6
+    lr_ideal = 1e-6  # todo: change to 1e-7
 
     def __init__(self):
         super().__init__(skip=False)
