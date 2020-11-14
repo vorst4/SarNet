@@ -80,3 +80,12 @@ class ResBlocks(nn.Module, ABC):
 
     def forward(self, x):
         return self.res_blocks(x)
+
+
+class SarNetRV5(nn.Module, ABC):
+    """
+    SarNetRV4 without dropout
+    """
+
+    def __init__(self):
+        super().__init__(d=0)
