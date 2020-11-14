@@ -13,15 +13,17 @@ from util.timer import Timer
 
 from util.report import Report
 
-# Report()
-# exit()
+if settings.RUNNING_ON_DESKTOP:
+    # Report()
+    # exit()
+    pass
 
 # -------------------------------- ARGUMENTS -------------------------------- #
 # On the server, several parameters should be passed when running the
 # script, this is not necessary when running it on the desktop
 if settings.RUNNING_ON_DESKTOP:
     partition_id = 1
-    job_id = 5
+    job_id = 6
     n_cpus = 4
     n_gpus = 1
 else:
@@ -39,6 +41,7 @@ else:
 
 # choose learning rate & model, based on job & partition id
 # lr = 1e-7
+job_id = 6
 modelname = [
     'SarNetL',  # 0
     'SarNetC',  # 1

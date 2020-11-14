@@ -10,7 +10,8 @@ from util.data import IDX, KEY
 from numpy import pi
 import numpy as np
 
-root_models = 'C:/Users/Dennis/Documents/desktop_resnet_output'
+# root_models = 'C:/Users/Dennis/Documents/desktop_resnet_output'
+root_models = 'C:/Users/Dennis/Documents/server4'
 modelpaths = [str(p) for p in Path(root_models).glob('*/design.pt')]
 dataset_path = settings.dataset.file
 n_samples_dataset = settings.dataset.max_samples
@@ -31,6 +32,7 @@ class Report:
         # dummy loss function
         lf = torch.nn.MSELoss()
 
+        # load performances
         performances = []
         modelnames = []
         for path in modelpaths:
@@ -43,7 +45,10 @@ class Report:
                 dlt, dlv, model, lf, None, None, 0, log
             )
 
-            design = design.load(path, '', dlt, dlv, log)
+            try:
+                design = design.load(path, '', dlt, dlv, log)
+            except AttributeError:
+                continue
 
             performances.append(design.performance)
 
@@ -54,12 +59,13 @@ class Report:
         self.slice_phases = slice(1, 24, 2)
         self.slice_amplitudes = slice(0, 24, 2)
 
-        # self.loss_train()
-        # self.loss_valid()
-        # self.mse_train()
-        # self.mse_valid()
+        n_av = 10
+        self.loss_train()
+        self.loss_valid(n_average=n_av)
+        self.mse_train()
+        self.mse_valid(n_average=n_av)
         self.mape5_train()
-        self.mape5_valid()
+        self.mape5_valid(n_average=n_av)
         #
         # self.mape5i_idx()
         # self.mape5i_phase()
@@ -83,13 +89,11 @@ class Report:
                 break
         return xa, ya
 
-    def _plot(self, attribute, save, show, n_average=None, log=True):
+    def _plot(self, attribute, save, show, n_average=None, log=True,
+              ylim: [float, float] = None):
         plt.figure()
         for p, name in zip(self.performances, self.modelnames):
             obj = getattr(p, attribute)
-            # print(obj.idx)
-            # print(obj.x[:obj.idx])
-            print(obj.y)
             x, y = obj.x[:obj.idx], obj.y[:obj.idx]
             if n_average is not None:
                 x, y = self.average(x, y, n_average)
@@ -97,6 +101,8 @@ class Report:
                 plt.semilogy(x, y, label=name)
             else:
                 plt.plot(x, y, label=name)
+        if ylim is not None:
+            plt.ylim(*ylim)
         plt.xlabel('epochs')
         plt.ylabel('Loss')
         plt.legend()
@@ -110,24 +116,27 @@ class Report:
         self._plot('loss_train', save, show)
         plt.title('Loss Training')
 
-    def loss_valid(self, save: bool = False, show: bool = False):
-        self._plot('loss_valid', save, show)
+    def loss_valid(self, save: bool = False, show: bool = False,
+                   n_average=5):
+        self._plot('loss_valid', save, show, n_average=n_average)
         plt.title('Loss Validation')
 
     def mse_train(self, save: bool = False, show: bool = False):
         self._plot('mse_train', save, show)
         plt.title('MSE Training')
 
-    def mse_valid(self, save: bool = False, show: bool = False):
-        self._plot('mse_valid', save, show)
+    def mse_valid(self, save: bool = False, show: bool = False,
+                  n_average=5):
+        self._plot('mse_valid', save, show, n_average=n_average)
         plt.title('MSE Validation')
 
     def mape5_train(self, save: bool = False, show: bool = False):
-        self._plot('mape5_train', save, show, log=False)
+        self._plot('mape5_train', save, show, log=False, ylim=[0, 100])
         plt.title('MAPE5 Training')
 
-    def mape5_valid(self, save: bool = False, show: bool = False):
-        self._plot('mape5_valid', save, show, log=False)
+    def mape5_valid(self, save: bool = False, show: bool = False, n_average=5):
+        self._plot('mape5_valid', save, show, log=False, ylim=[0, 100],
+                   n_average=n_average)
         plt.title('MAPE5 Validation')
         pass
 
