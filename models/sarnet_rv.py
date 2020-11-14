@@ -257,3 +257,5 @@ class SarNetRV3(SarNetRV, ABC):
 
     def __init__(self):
         super().__init__(n=2, d=0.2)
+
+
