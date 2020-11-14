@@ -17,8 +17,8 @@ class SarNetRV4(nn.Module, ABC):
 
     def __init__(
             self,
-            d: float = settings.dropout_rate,
-            n: int = 5
+            d: float = 0.2,
+            n: int = 2
     ):
         super().__init__()
 
