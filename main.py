@@ -10,6 +10,7 @@ import util.data as data
 from util.design import Design
 from util.log import Log
 from util.timer import Timer
+import models.sarnet_rv4
 
 from util.report import Report
 
@@ -18,12 +19,14 @@ if settings.RUNNING_ON_DESKTOP:
     # exit()
     pass
 
+import util.data_ae as data_ae
+
 # -------------------------------- ARGUMENTS -------------------------------- #
 # On the server, several parameters should be passed when running the
 # script, this is not necessary when running it on the desktop
 if settings.RUNNING_ON_DESKTOP:
     partition_id = 1
-    job_id = 1
+    job_id = 0
     n_cpus = 4
     n_gpus = 1
 else:
@@ -39,11 +42,13 @@ else:
 
 # ----------------------------------- MISC ---------------------------------- #
 
+use_ae_dataset = True if job_id == 0 else False
+settings.use_ae_dataset = use_ae_dataset
+
 # choose learning rate & model, based on job & partition id
 # lr = 1e-7
 modelname = [
     'SarNetRV4',  # 0
-    'SarNetRV5',  # 1
 ][job_id]
 # modelname = [
 #     'SarNetL',  # 0
@@ -83,7 +88,7 @@ timer = Timer(log)
 log('setting up dataset')
 
 # transformation functions to be applied to training data
-if job_id is 6:
+if job_id is 6 or 0:
     trans_train = transform.Compose([
         data.RandomRotation90(),
         data.RandomVerticalFlip(),
@@ -93,7 +98,10 @@ else:
 
 # create dataset and obtain DataLoader objects for train/valid set
 timer.start()
-ds = data.Dataset(settings.dataset, trans_train=trans_train)
+if use_ae_dataset:
+    ds = data_ae.DatasetAE(settings.dataset, trans_train=trans_train)
+else:
+    ds = data.Dataset(settings.dataset, trans_train=trans_train)
 log('  dataset file: %s' % str(ds.settings.file))
 dls_train, dls_valid = ds.dataloaders_train, ds.dataloaders_valid
 timer.stop('created dataset')

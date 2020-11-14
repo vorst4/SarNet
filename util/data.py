@@ -334,7 +334,7 @@ class _Subset(torch.utils.data.Dataset):
     KEY = KEY
     IDX = IDX
 
-    def __init__(self, dataset: Dataset, stype, idx_subset, transform):
+    def __init__(self, dataset, stype, idx_subset, transform):
         self.dataset = dataset
         self.stype = stype
         self.idx_subset = idx_subset

@@ -34,6 +34,8 @@ if RUNNING_ON_DESKTOP:
         save_log=True,
     )
 
+    use_ae_dataset = None
+
     dropout_rate = 0.5
 
     # log the timer or not
