@@ -43,7 +43,7 @@ else:
 # lr = 1e-7
 modelname = [
     'SarNetRV4',  # 0
-    'SarNetRV3',  # 1
+    'SarNetRV5',  # 1
 ][job_id]
 # modelname = [
 #     'SarNetL',  # 0
