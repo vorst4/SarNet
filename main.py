@@ -42,7 +42,7 @@ else:
 # choose learning rate & model, based on job & partition id
 # lr = 1e-7
 modelname = [
-    'SarNetRV2',  # 0
+    'SarNetRV4',  # 0
     'SarNetRV3',  # 1
 ][job_id]
 # modelname = [
