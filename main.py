@@ -21,6 +21,7 @@ if settings.RUNNING_ON_DESKTOP:
 
 import util.data_ae as data_ae
 
+
 # -------------------------------- ARGUMENTS -------------------------------- #
 # On the server, several parameters should be passed when running the
 # script, this is not necessary when running it on the desktop
@@ -43,8 +44,9 @@ else:
 # ----------------------------------- MISC ---------------------------------- #
 
 use_ae_dataset = True if job_id == 0 else False
-# use_ae_dataset = False
+use_ae_dataset = False
 settings.use_ae_dataset = use_ae_dataset
+print(settings.use_ae_dataset)
 
 # choose learning rate & model, based on job & partition id
 # lr = 1e-7

@@ -45,8 +45,6 @@ class MAPE5i:
         # todo: find a more efficient way than a for loop
         mape5i = torch.empty(n)
         for i, j in enumerate(ids):
-            yt[i, j]
-            yp[i, j]
             a = self.scalar * torch.sum(torch.abs(
                 (yt[i, j] - yp[i, j]) / yt[i, j]
             ))

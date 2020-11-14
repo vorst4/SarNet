@@ -13,7 +13,7 @@ class SarNetRV4(nn.Module, ABC):
     """
     mobile inverse blocks variant of SarNetRV
     """
-    lr_ideal = 1e-8
+    lr_ideal = 1e-3
 
     def __init__(
             self,
@@ -27,18 +27,14 @@ class SarNetRV4(nn.Module, ABC):
         r = settings.IMG_RESOLUTION  # resolution input
         n_meta = 24  # number of meta-data input variables
         self.train_enc = train_enc
-        self.encoder = Encoder(c=c, n=n, n_meta=n_meta)
+        self.encoder = Encoder(c=c, n=n, n_meta=n_meta,
+                               train_enc=settings.use_ae_dataset)
         self.decoder = Decoder(c=c, n=n, d=d,
                                train_encoder=settings.use_ae_dataset)
 
     def forward(self, xp, xs):
 
-        # encoder
-        if settings.use_ae_dataset:
-            xp = self.encoder(xp)
-        else:
-            with torch.no_grad:
-                xp = self.encoder(xp)
+        xp = self.encoder(xp)
 
         # bottleneck
         n_batch, n_par = xp.shape[0], xp.shape[1] // 2
@@ -57,8 +53,9 @@ class SarNetRV4(nn.Module, ABC):
 
 
 class Encoder(nn.Module, ABC):
-    def __init__(self, c, n, n_meta):
+    def __init__(self, c, n, n_meta, train_enc: bool):
         super().__init__()
+        self.train_enc = train_enc
         self.encoder = nn.Sequential(
             # start:  32
             ConvHs(ci=3, co=c // 32, k=3, p=1),
@@ -75,6 +72,12 @@ class Encoder(nn.Module, ABC):
             # stage 4: 4 -> 1
             ConvHs(ci=c // 4, co=c - 2 * n_meta, k=4, p=0),
         )
+
+    def update_grad(self):
+
+        if settings.use_ae_dataset is False:
+            for p in self.parameters():
+                p.requires_grad = False
 
     def forward(self, x):
         return self.encoder(x)
