@@ -11,15 +11,16 @@ from math import gcd
 class SarNetRV(nn.Module, ABC):
     lr_ideal = 1e-8
 
-    def __init__(self):
+    def __init__(
+            self,
+            d: float = settings.dropout_rate,
+            n: int = 5
+    ):
         super().__init__()
 
         c = int(1024)  # channels
         r = settings.IMG_RESOLUTION  # resolution input
         n_meta = 24  # number of meta-data input variables
-        d = settings.dropout_rate
-        # d = 0
-        n = 5
 
         self.encoder = nn.Sequential(
             # start:  32
@@ -238,3 +239,21 @@ class TConvHsDr(nn.Module, ABC):
         if self.d is not 0:
             x = self.dropout(x)
         return x
+
+
+class SarNetRV2(SarNetRV, ABC):
+    """
+    Same as SarNetRV but without dropout
+    """
+
+    def __init__(self):
+        super().__init__(d=0)
+
+
+class SarNetRV3(SarNetRV, ABC):
+    """
+    Same as SarNetRV but only 2 consequtive resblocks and reduced dropout
+    """
+
+    def __init__(self):
+        super().__init__(n=2, d=0.2)

@@ -6,4 +6,4 @@ from .sarnet_l import SarNetL
 from .sarnet_c import SarNetC
 from .sarnet_r import SarNetRN, SarNetRS
 from .sarnet_m import SarNetM
-from .sarnet_rv import SarNetRV
+from .sarnet_rv import SarNetRV, SarNetRV2, SarNetRV3

@@ -24,7 +24,7 @@ if RUNNING_ON_DESKTOP:
         # file='dataset_msf.zip',
         max_samples=1000,
         train_pct=90,
-        n_subsets=10,
+        n_subsets=max(10 // 100, 1),
         shuffle_train=True,
         shuffle_valid=True,
     )
@@ -79,9 +79,9 @@ else:
     dataset = Dataset.Settings(
         file='dataset_' + ds + '.zip',
         # file='dataset_msf.zip',
-        max_samples=MAX_SAMPLES,
+        max_samples=MAX_SAMPLES // 100,
         train_pct=90,
-        n_subsets=15,
+        n_subsets=15 // 15,
         shuffle_train=True,
         shuffle_valid=True,
     )

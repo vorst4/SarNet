@@ -23,7 +23,7 @@ if settings.RUNNING_ON_DESKTOP:
 # script, this is not necessary when running it on the desktop
 if settings.RUNNING_ON_DESKTOP:
     partition_id = 1
-    job_id = 6
+    job_id = 1
     n_cpus = 4
     n_gpus = 1
 else:
@@ -41,16 +41,19 @@ else:
 
 # choose learning rate & model, based on job & partition id
 # lr = 1e-7
-job_id = 6
 modelname = [
-    'SarNetL',  # 0
-    'SarNetC',  # 1
-    'SarNetRN',  # 2
-    'SarNetRS',  # 3
-    'SarNetM',  # 4
-    'SarNetRV',  # 5
-    'SarNetRN',  # 6  , including data augmentations
+    'SarNetRV2',  # 0
+    'SarNetRV3',  # 1
 ][job_id]
+# modelname = [
+#     'SarNetL',  # 0
+#     'SarNetC',  # 1
+#     'SarNetRN',  # 2
+#     'SarNetRS',  # 3
+#     'SarNetM',  # 4
+#     'SarNetRV',  # 5
+#     'SarNetRN',  # 6  , including data augmentations
+# ][job_id]
 
 # set/create root path from modelname
 settings.progress.path = settings.progress.add_subdir(settings.progress.path,
