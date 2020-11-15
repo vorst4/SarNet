@@ -95,6 +95,8 @@ else:
         save_log=True,
     )
 
+    use_ae_dataset = False
+
     dropout_rate = 0.4
 
     # log the timer or not
