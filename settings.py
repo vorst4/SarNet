@@ -83,7 +83,7 @@ else:
     dataset = Dataset.Settings(
         file='dataset_' + ds + '.zip',
         # file='dataset_msf.zip',
-        max_samples=MAX_SAMPLES // 100,
+        max_samples=MAX_SAMPLES // 1000,
         train_pct=90,
         n_subsets=15 // 15,
         shuffle_train=True,
@@ -108,7 +108,7 @@ else:
 
     # settings learning-rate tuner
     # beta1s = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.999]
-    epochs = 100
+    epochs = 500
 
     # progress logging settings
     progress = Progress.Settings(

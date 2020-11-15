@@ -58,6 +58,8 @@ elif job_id == 6:
 elif job_id == 7:
     settings.beta2 = 0.4
 
+settings.progress.save_preview = False
+settings.progress.save_design = False
 modelname = 'SarNetRS'
 
 # settings.use_ae_dataset = True if job_id == 1 else False
