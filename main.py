@@ -11,6 +11,7 @@ from util.design import Design
 from util.log import Log
 from util.timer import Timer
 import models.sarnet_rv4
+import util.data_ae as data_ae
 
 from util.report import Report
 
@@ -19,7 +20,6 @@ if settings.RUNNING_ON_DESKTOP:
     # exit()
     pass
 
-import util.data_ae as data_ae
 
 
 # -------------------------------- ARGUMENTS -------------------------------- #
@@ -41,17 +41,33 @@ else:
     n_cpus = parser.parse_args().n_cpus
     n_gpus = parser.parse_args().n_gpus
 
-# ----------------------------------- MISC ---------------------------------- #
+# ---------------------------------- SETUP ---------------------------------- #
 
-use_ae_dataset = True if job_id == 0 else False
-# use_ae_dataset = False
-settings.use_ae_dataset = use_ae_dataset
+if job_id == 1:
+    settings.beta1 = 0.8
+elif job_id == 2:
+    settings.beta1 = 0.6
+elif job_id == 3:
+    settings.beta1 = 0.4
+elif job_id == 4:
+    settings.beta2 = 0.9
+elif job_id == 5:
+    settings.beta2 = 0.8
+elif job_id == 6:
+    settings.beta2 = 0.6
+elif job_id == 7:
+    settings.beta2 = 0.4
+
+modelname = 'SarNetRS'
+
+# settings.use_ae_dataset = True if job_id == 1 else False
 
 # choose learning rate & model, based on job & partition id
 # lr = 1e-7
-modelname = [
-    'SarNetRV4',  # 0
-][job_id]
+# modelname = [
+#     'SarNetRV4',  # 0
+# ][job_id]
+
 # modelname = [
 #     'SarNetL',  # 0
 #     'SarNetC',  # 1
@@ -67,6 +83,8 @@ settings.progress.path = settings.progress.add_subdir(settings.progress.path,
                                                       modelname,
                                                       partition_id,
                                                       job_id)
+
+# ----------------------------------- MISC ---------------------------------- #
 
 # initialize log
 if settings.log.directory is None:
@@ -100,7 +118,7 @@ else:
 
 # create dataset and obtain DataLoader objects for train/valid set
 timer.start()
-if use_ae_dataset:
+if settings.use_ae_dataset:
     ds = data_ae.DatasetAE(settings.dataset, trans_train=trans_train)
 else:
     ds = data.Dataset(settings.dataset, trans_train=trans_train)
@@ -127,7 +145,7 @@ log('...done')
 lr_init = settings.learning_rate.initial
 lr_init = model.lr_ideal if lr_init is None else lr_init
 optimizer = torch.optim.Adam(
-    model.parameters(), lr=lr_init
+    model.parameters(), lr=lr_init, betas=(settings.beta1, settings.beta2)
 )
 log('using optimizer: \n  %s' % str(optimizer).replace('\n', '\n  '))
 

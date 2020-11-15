@@ -72,6 +72,7 @@ class Encoder(nn.Module, ABC):
             # stage 4: 4 -> 1
             ConvHs(ci=c // 4, co=c - 2 * n_meta, k=4, p=0),
         )
+        self.update_grad()
 
     def update_grad(self):
 

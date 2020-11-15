@@ -34,7 +34,7 @@ if RUNNING_ON_DESKTOP:
         save_log=True,
     )
 
-    use_ae_dataset = None
+    use_ae_dataset = False
 
     dropout_rate = 0.5
 
@@ -68,6 +68,8 @@ if RUNNING_ON_DESKTOP:
         step_size=1,  # decay every <step_size> epochs
         gamma=0.9  # decay factor
     )
+
+    beta1, beta2 = 0.9, 0.999
 
 # -----------------------------------------------------------------------------
 # SETTINGS SERVER
@@ -106,7 +108,7 @@ else:
 
     # settings learning-rate tuner
     # beta1s = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.999]
-    epochs = 3000
+    epochs = 2
 
     # progress logging settings
     progress = Progress.Settings(
@@ -123,6 +125,8 @@ else:
         step_size=1,  # decay every <step_size> epochs
         gamma=0.9  # decay factor
     )
+
+    beta1, beta2 = 0.9, 0.999
 
 
 def info(indent: str = ' ' * 2):
